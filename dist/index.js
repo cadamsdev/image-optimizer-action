@@ -19887,7 +19887,7 @@ var init_esm = __esm({
 });
 
 // src/constants.ts
-var GITHUB_TOKEN, DEBUG, COMPRESS_SVG, COMPRESS_PNG, COMPRESS_JPG, COMPRESS_WEBP, COMPRESS_AVIF, EXPORT_WEBP, EXPORT_AVIF, IGNORE_PATHS, PR_BODY_CHAR_LIMIT, TEMP_DIR;
+var GITHUB_TOKEN, DEBUG, COMPRESS_SVG, COMPRESS_PNG, COMPRESS_JPG, COMPRESS_GIF, COMPRESS_WEBP, COMPRESS_AVIF, EXPORT_WEBP, EXPORT_AVIF, REPLACE_ORIGINAL_AFTER_EXPORT_WEBP, IGNORE_PATHS, PR_BODY_CHAR_LIMIT, TEMP_DIR;
 var init_constants = __esm({
   "src/constants.ts"() {
     "use strict";
@@ -19897,10 +19897,12 @@ var init_constants = __esm({
     COMPRESS_SVG = process.env["INPUT_COMPRESS-SVG"] ? process.env["INPUT_COMPRESS-SVG"] === "true" : true;
     COMPRESS_PNG = process.env["INPUT_COMPRESS-PNG"] ? process.env["INPUT_COMPRESS-PNG"] === "true" : true;
     COMPRESS_JPG = process.env["INPUT_COMPRESS-JPG"] ? process.env["INPUT_COMPRESS-JPG"] === "true" : true;
+    COMPRESS_GIF = process.env["INPUT_COMPRESS-GIF"] ? process.env["INPUT_COMPRESS-GIF"] === "true" : true;
     COMPRESS_WEBP = process.env["INPUT_COMPRESS-WEBP"] ? process.env["INPUT_COMPRESS-WEBP"] === "true" : true;
     COMPRESS_AVIF = process.env["INPUT_COMPRESS-AVIF"] ? process.env["INPUT_COMPRESS-AVIF"] === "true" : true;
     EXPORT_WEBP = process.env["INPUT_EXPORT-WEBP"] === "true";
     EXPORT_AVIF = process.env["INPUT_EXPORT-AVIF"] === "true";
+    REPLACE_ORIGINAL_AFTER_EXPORT_WEBP = process.env["INPUT_REPLACE-ORIGINAL-AFTER-EXPORT-WEBP"] === "true";
     IGNORE_PATHS = process.env["INPUT_IGNORE-PATHS"] ? process.env["INPUT_IGNORE-PATHS"].split("\n").filter((path2) => !!path2) : [];
     PR_BODY_CHAR_LIMIT = 65536;
     TEMP_DIR = `./temp-${v4_default()}`;
@@ -30759,7 +30761,7 @@ function copyFile(src, dest) {
   (0, import_fs2.mkdirSync)(destDir, { recursive: true });
   (0, import_fs2.copyFileSync)(src, dest);
 }
-function moveSignificantFiles(significantFileChanges) {
+function moveSignificantFilesSync(significantFileChanges) {
   for (const item of significantFileChanges) {
     const tempFilename = `${TEMP_DIR}/${item.fileName}`;
     log(`Moving file: ${tempFilename} to ${item.fileName}`);
@@ -30770,7 +30772,7 @@ function moveSignificantFiles(significantFileChanges) {
 function checkBeforeFileSizes(dataMap3, tempImageFileNames) {
   for (const fileName of tempImageFileNames) {
     const fileSizeBefore = (0, import_fs2.statSync)(fileName).size;
-    log(`temp image: ${fileName}, size: ${fileSizeBefore}`);
+    log(`temp image: ${fileName}, size: ${formatSize(fileSizeBefore)}`);
     const originalFileName = fileName.replace(`${TEMP_DIR}/`, "");
     dataMap3.set(originalFileName, {
       fileName: originalFileName,
@@ -30790,6 +30792,7 @@ function checkBeforeFileSizes(dataMap3, tempImageFileNames) {
         { flag: EXPORT_WEBP, extension: "webp" },
         { flag: EXPORT_AVIF, extension: "avif" }
       ],
+      gif: [{ flag: EXPORT_WEBP, extension: "webp" }],
       webp: [{ flag: EXPORT_AVIF, extension: "avif" }]
     };
     for (const [extension, exportedFormats] of Object.entries(imageExportMap)) {
@@ -30818,6 +30821,9 @@ function checkFileSizesAfter(dataMap3) {
   let changed = false;
   for (const item of dataMap3.values()) {
     const tempFilename = `${TEMP_DIR}/${item.fileName}`;
+    if (!(0, import_fs2.statSync)(tempFilename)) {
+      continue;
+    }
     const fileSize = (0, import_fs2.statSync)(tempFilename).size;
     item.fileSizeAfter = fileSize;
     const percentageChange = getPercentageChange(item.fileSizeBefore, fileSize);
@@ -30828,6 +30834,18 @@ function checkFileSizesAfter(dataMap3) {
     }
   }
   return changed;
+}
+async function deleteFiles(filePaths) {
+  const deletePromises = filePaths.map((file) => {
+    return (0, import_fs2.unlink)(file, () => {
+    });
+  });
+  await Promise.all(deletePromises);
+}
+function copyFilesToTempDirSync(filePaths) {
+  for (const filePath of filePaths) {
+    copyFile(filePath, `${TEMP_DIR}/${filePath}`);
+  }
 }
 var import_fs2;
 var init_file_utils = __esm({
@@ -30841,90 +30859,207 @@ var init_file_utils = __esm({
 });
 
 // src/image-optimizer.ts
-async function processSvgs() {
+async function processImages({
+  svgFileNames,
+  avifFileNames,
+  webpFileNames,
+  jpgFileNames,
+  pngFileNames,
+  gifFileNames
+}) {
+  await processSvgs(svgFileNames);
+  await processAvif(avifFileNames);
+  await processWebp(webpFileNames);
+  await processJpgs(jpgFileNames);
+  await processPngs(pngFileNames);
+  await processGifs(gifFileNames);
+}
+function getImageProcessorConfig(allFiles) {
+  const svgFileNames = allFiles.filter((filename) => filename.endsWith(".svg"));
+  const pngFileNames = allFiles.filter((filename) => filename.endsWith(".png"));
+  const jpgFileNames = allFiles.filter(
+    (filename) => filename.endsWith(".jpg") || filename.endsWith(".jpeg")
+  );
+  const webpFileNames = allFiles.filter(
+    (filename) => filename.endsWith(".webp")
+  );
+  const avifFileNames = allFiles.filter(
+    (filename) => filename.endsWith(".avif")
+  );
+  const gifFileNames = allFiles.filter((filename) => filename.endsWith(".gif"));
+  log(`SVG files: ${svgFileNames.length}`);
+  log(`PNG files: ${pngFileNames.length}`);
+  log(`JPG files: ${jpgFileNames.length}`);
+  log(`WEBP files: ${webpFileNames.length}`);
+  log(`AVIF files: ${avifFileNames.length}`);
+  log(`GIF files: ${gifFileNames.length}`);
+  return {
+    jpgFileNames,
+    pngFileNames,
+    gifFileNames,
+    svgFileNames,
+    webpFileNames,
+    avifFileNames
+  };
+}
+function getFileNamesToCompress(config) {
+  const allImageFileNames = [];
+  const compressionMappings = [
+    { flag: COMPRESS_SVG, fileNames: config.svgFileNames },
+    { flag: COMPRESS_PNG, fileNames: config.pngFileNames },
+    { flag: COMPRESS_JPG, fileNames: config.jpgFileNames },
+    { flag: COMPRESS_WEBP, fileNames: config.webpFileNames },
+    { flag: COMPRESS_AVIF, fileNames: config.avifFileNames },
+    { flag: COMPRESS_GIF, fileNames: config.gifFileNames }
+  ];
+  for (const { flag, fileNames } of compressionMappings) {
+    if (flag) {
+      allImageFileNames.push(...fileNames);
+    }
+  }
+  return allImageFileNames;
+}
+async function processSvgs(svgFileNames) {
+  if (!svgFileNames.length) {
+    return;
+  }
   if (!COMPRESS_SVG) {
     return;
   }
   try {
-    await (0, import_exec.exec)(`npx svgo --multipass -r ${TEMP_DIR}`);
-  } catch (err) {
-    console.error(`Error processing svgs:`, err);
+    await (0, import_exec.exec)(`svgo --multipass -r ${TEMP_DIR}`);
+  } catch (error) {
+    console.error(`Error processing svgs:`, error);
   }
 }
-async function processWebp() {
-  if (COMPRESS_WEBP) {
-    try {
-      await (0, import_exec.exec)(`npx sharp-cli -i ${TEMP_DIR}/**/*.webp -o {dir}`);
-    } catch (err) {
-      console.error(`Error exporting webps:`, err);
-    }
+async function processWebp(webpFileNames) {
+  if (!webpFileNames.length) {
+    return;
   }
   if (EXPORT_AVIF) {
     try {
-      await (0, import_exec.exec)(`npx sharp-cli -i ${TEMP_DIR}/**/*.webp -f avif -o {dir}`);
+      await (0, import_exec.exec)(`sharp -i ${TEMP_DIR}/**/*.webp -f avif -o {dir}`);
     } catch (error) {
       console.error(`Error exporting avifs:`, error);
     }
   }
-}
-async function processAvif() {
-  if (COMPRESS_AVIF) {
-    try {
-      await (0, import_exec.exec)(`npx sharp-cli -i ${TEMP_DIR}/**/*.avif -o {dir}`);
-    } catch (error) {
-      console.error(`Error exporting avifs:`, error);
-    }
-  }
-}
-async function processJpgs() {
-  if (COMPRESS_JPG) {
+  if (COMPRESS_WEBP) {
     try {
       await (0, import_exec.exec)(
-        `npx sharp-cli -i ${TEMP_DIR}/**/*.{jpg,jpeg} -f jpg -o {dir} --progressive`
+        `sharp -i ${TEMP_DIR}/**/*.webp -o {dir} --animated --nearLossless`
       );
-    } catch (err) {
-      console.error(`Error exporting jpgs:`, err);
+    } catch (error) {
+      console.error(`Error exporting webps:`, error);
     }
+  }
+}
+async function processAvif(avifFileNames) {
+  if (!avifFileNames.length) {
+    return;
+  }
+  if (COMPRESS_AVIF) {
+    try {
+      await (0, import_exec.exec)(`sharp -i ${TEMP_DIR}/**/*.avif -o {dir}`);
+    } catch (error) {
+      console.error(`Error exporting avifs:`, error);
+    }
+  }
+}
+async function processJpgs(jpgFiles) {
+  if (!jpgFiles.length) {
+    return;
   }
   if (EXPORT_WEBP) {
     try {
-      await (0, import_exec.exec)(
-        `npx sharp-cli -i ${TEMP_DIR}/**/*.{jpg,jpeg} -f webp -o {dir}`
-      );
-    } catch (err) {
-      console.error(`Error converting jpg into webp:`, err);
+      await (0, import_exec.exec)(`sharp -i ${TEMP_DIR}/**/*.{jpg,jpeg} -f webp -o {dir}`);
+    } catch (error) {
+      console.error(`Error converting jpg into webp:`, error);
     }
   }
   if (EXPORT_AVIF) {
     try {
-      await (0, import_exec.exec)(
-        `npx sharp-cli -i ${TEMP_DIR}/**/*.{jpg,jpeg} -f avif -o {dir}`
-      );
+      await (0, import_exec.exec)(`sharp -i ${TEMP_DIR}/**/*.{jpg,jpeg} -f avif -o {dir}`);
     } catch (error) {
       console.error(`Error converting jpg avif:`, error);
     }
   }
-}
-async function processPngs() {
-  if (COMPRESS_PNG) {
+  if (EXPORT_WEBP && REPLACE_ORIGINAL_AFTER_EXPORT_WEBP) {
     try {
-      await (0, import_exec.exec)(`npx sharp-cli -i ${TEMP_DIR}/**/*.png -o {dir}`);
-    } catch (err) {
-      console.error(`Error processing pngs:`, err);
+      log("Deleting original jpgs");
+      await deleteFiles(jpgFiles);
+    } catch (error) {
+      console.error(`Error deleting original jpgs:`, error);
     }
+  } else if (COMPRESS_JPG) {
+    try {
+      await (0, import_exec.exec)(
+        `sharp -i ${TEMP_DIR}/**/*.{jpg,jpeg} -f jpg -o {dir} --progressive`
+      );
+    } catch (error) {
+      console.error(`Error exporting jpgs:`, error);
+    }
+  }
+}
+async function processPngs(pngFiles) {
+  if (!pngFiles.length) {
+    return;
   }
   if (EXPORT_WEBP) {
     try {
-      await (0, import_exec.exec)(`npx sharp-cli -i ${TEMP_DIR}/**/*.png -f webp -o {dir}`);
-    } catch (err) {
-      console.error(`Error exporting webps:`, err);
+      await (0, import_exec.exec)(`sharp -i ${TEMP_DIR}/**/*.png -f webp -o {dir}`);
+    } catch (error) {
+      console.error(`Error exporting webps:`, error);
     }
   }
   if (EXPORT_AVIF) {
     try {
-      await (0, import_exec.exec)(`npx sharp-cli -i ${TEMP_DIR}/**/*.png -f avif -o {dir}`);
+      await (0, import_exec.exec)(`sharp -i ${TEMP_DIR}/**/*.png -f avif -o {dir}`);
     } catch (error) {
       console.error(`Error exporting avifs:`, error);
+    }
+  }
+  if (EXPORT_WEBP && REPLACE_ORIGINAL_AFTER_EXPORT_WEBP) {
+    try {
+      log("Deleting original pngs");
+      await deleteFiles(pngFiles);
+    } catch (error) {
+      console.error(`Error deleting original pngs:`, error);
+    }
+  } else if (COMPRESS_PNG) {
+    try {
+      await (0, import_exec.exec)(`sharp -i ${TEMP_DIR}/**/*.png -o {dir}`);
+    } catch (error) {
+      console.error(`Error processing pngs:`, error);
+    }
+  }
+}
+async function processGifs(gifFiles) {
+  if (!gifFiles.length) {
+    return;
+  }
+  if (EXPORT_WEBP) {
+    try {
+      await (0, import_exec.exec)(
+        `sharp -i ${TEMP_DIR}/**/*.gif -f webp -o {dir} --animated --nearLossless`
+      );
+    } catch (error) {
+      console.error(`Error exporting webps:`, error);
+    }
+  }
+  if (EXPORT_WEBP && REPLACE_ORIGINAL_AFTER_EXPORT_WEBP) {
+    try {
+      log("Deleting original gifs");
+      await deleteFiles(gifFiles);
+    } catch (error) {
+      console.error(`Error deleting original gifs:`, error);
+    }
+  } else if (COMPRESS_GIF) {
+    try {
+      await (0, import_exec.exec)(
+        `sharp -i ${TEMP_DIR}/**/*.gif -o {dir} --animated --nearLossless`
+      );
+    } catch (error) {
+      console.error(`Error processing gifs:`, error);
     }
   }
 }
@@ -30934,6 +31069,8 @@ var init_image_optimizer = __esm({
     "use strict";
     init_constants();
     import_exec = __toESM(require_exec());
+    init_file_utils();
+    init_logger_utils();
   }
 });
 
@@ -36638,7 +36775,7 @@ async function generateReport(data) {
   return { markdownReport, terminalReport };
 }
 async function generateMarkdownReport(data, totalSaved) {
-  const description = `Optimized <b>${data.length}</b> images, saved <b>${formatSize(totalSaved)}</b> in total.
+  const description = `Optimized <b>${data.length}</b> ${data.length > 1 ? "images" : "image"}, saved <b>${formatSize(totalSaved)}</b> in total.
 
 `;
   const header = `| Filename | Before | After | Difference |
@@ -36702,49 +36839,32 @@ __export(workflow_dispatch_exports, {
 });
 async function run() {
   log("Running workflow dispatch");
-  const allImageFileNames = [];
-  const compressionMappings = [
-    { flag: COMPRESS_SVG, fileNames: svgFileNames },
-    { flag: COMPRESS_PNG, fileNames: pngFileNames },
-    { flag: COMPRESS_JPG, fileNames: jpgFileNames },
-    { flag: COMPRESS_WEBP, fileNames: webpFileNames },
-    { flag: COMPRESS_AVIF, fileNames: avifFileNames }
-  ];
-  for (const { flag, fileNames } of compressionMappings) {
-    if (flag) {
-      allImageFileNames.push(...fileNames);
-    }
+  const allFiles = findAllFiles(".");
+  const ipConfig = getImageProcessorConfig(allFiles);
+  const fileNamesToCompress = getFileNamesToCompress(ipConfig);
+  if (!fileNamesToCompress.length) {
+    log("No images to optimize");
+    return;
   }
-  for (const fileName of allImageFileNames) {
-    log(`Copying file: ${fileName} into ${TEMP_DIR}/${fileName}`);
-    copyFile(fileName, `${TEMP_DIR}/${fileName}`);
-  }
-  const tempImageFileNames = allImageFileNames.map(
+  log(`Optimizing ${fileNamesToCompress.length} images`);
+  copyFilesToTempDirSync(fileNamesToCompress);
+  const tempImageFileNames = fileNamesToCompress.map(
     (file) => `${TEMP_DIR}/${file}`
   );
   await checkBeforeFileSizes(dataMap, tempImageFileNames);
-  const imageProcessors = [
-    { fileNames: svgFileNames, process: processSvgs },
-    { fileNames: avifFileNames, process: processAvif },
-    { fileNames: webpFileNames, process: processWebp },
-    { fileNames: pngFileNames, process: processPngs },
-    { fileNames: jpgFileNames, process: processJpgs }
-  ];
-  for (const { fileNames, process: process2 } of imageProcessors) {
-    if (fileNames.length) {
-      await process2();
-    }
-  }
+  await processImages(ipConfig);
   const changed = checkFileSizesAfter(dataMap);
   if (!changed) {
     log("No changes in file sizes");
     return;
   }
-  const significantFileChanges = Array.from(dataMap.values()).filter((item) => item.isChangeSignificant);
-  moveSignificantFiles(significantFileChanges);
+  const significantFileChanges = Array.from(dataMap.values()).filter(
+    (item) => item.isChangeSignificant
+  );
+  moveSignificantFilesSync(significantFileChanges);
   await generateReport(significantFileChanges);
 }
-var dataMap, allFiles, svgFileNames, pngFileNames, jpgFileNames, webpFileNames, avifFileNames;
+var dataMap;
 var init_workflow_dispatch = __esm({
   "src/events/workflow-dispatch.ts"() {
     "use strict";
@@ -36754,14 +36874,6 @@ var init_workflow_dispatch = __esm({
     init_constants();
     init_report();
     dataMap = /* @__PURE__ */ new Map();
-    allFiles = findAllFiles(".");
-    log("allFiles");
-    allFiles.forEach((file) => log(file));
-    svgFileNames = allFiles.filter((filename) => filename.endsWith(".svg"));
-    pngFileNames = allFiles.filter((filename) => filename.endsWith(".png"));
-    jpgFileNames = allFiles.filter((filename) => filename.endsWith(".jpg") || filename.endsWith(".jpeg"));
-    webpFileNames = allFiles.filter((filename) => filename.endsWith(".webp"));
-    avifFileNames = allFiles.filter((filename) => filename.endsWith(".avif"));
   }
 });
 
@@ -36807,49 +36919,20 @@ async function run2() {
     return;
   }
   await checkoutBranch(branchName);
-  const allFiles2 = await getPRFileNames();
-  const svgFiles = allFiles2.filter((filename) => filename.endsWith(".svg"));
-  const pngFiles = allFiles2.filter((filename) => filename.endsWith(".png"));
-  const jpgFiles = allFiles2.filter((filename) => filename.endsWith(".jpg") || filename.endsWith(".jpeg"));
-  const webpFiles = allFiles2.filter((filename) => filename.endsWith(".webp"));
-  const avifFiles = allFiles2.filter((filename) => filename.endsWith(".avif"));
-  const allImageFileNames = [];
-  const compressionMappings = [
-    { flag: COMPRESS_SVG, fileNames: svgFiles },
-    { flag: COMPRESS_PNG, fileNames: pngFiles },
-    { flag: COMPRESS_JPG, fileNames: jpgFiles },
-    { flag: COMPRESS_WEBP, fileNames: webpFiles },
-    { flag: COMPRESS_AVIF, fileNames: avifFiles }
-  ];
-  for (const { flag, fileNames } of compressionMappings) {
-    if (flag) {
-      allImageFileNames.push(...fileNames);
-    }
-  }
-  if (!allImageFileNames.length) {
+  const allFiles = await getPRFileNames();
+  const ipConfig = getImageProcessorConfig(allFiles);
+  const fileNamesToCompress = getFileNamesToCompress(ipConfig);
+  if (!fileNamesToCompress.length) {
     log("No images to optimize");
     return;
   }
-  for (const fileName of allImageFileNames) {
-    copyFile(fileName, `${TEMP_DIR}/${fileName}`);
-  }
-  log(`Optimizing ${allImageFileNames.length} images`);
-  const tempImageFileNames = allImageFileNames.map(
+  log(`Optimizing ${fileNamesToCompress.length} images`);
+  copyFilesToTempDirSync(fileNamesToCompress);
+  const tempImageFileNames = fileNamesToCompress.map(
     (file) => `${TEMP_DIR}/${file}`
   );
   await checkBeforeFileSizes(dataMap2, tempImageFileNames);
-  const imageProcessors = [
-    { fileNames: svgFiles, process: processSvgs },
-    { fileNames: avifFiles, process: processAvif },
-    { fileNames: webpFiles, process: processWebp },
-    { fileNames: pngFiles, process: processPngs },
-    { fileNames: jpgFiles, process: processJpgs }
-  ];
-  for (const { fileNames, process: process2 } of imageProcessors) {
-    if (fileNames.length) {
-      await process2();
-    }
-  }
+  await processImages(ipConfig);
   const changed = checkFileSizesAfter(dataMap2);
   if (!changed) {
     log("No changes in file sizes");
@@ -36858,7 +36941,7 @@ async function run2() {
   const significantFileChanges = Array.from(dataMap2.values()).filter(
     (item) => item.isChangeSignificant
   );
-  moveSignificantFiles(significantFileChanges);
+  moveSignificantFilesSync(significantFileChanges);
   const { markdownReport } = await generateReport(significantFileChanges);
   await commitAndPush(branchName);
   if (markdownReport) {
