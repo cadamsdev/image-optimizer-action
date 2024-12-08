@@ -4,7 +4,7 @@
 
 A GitHub action that automatically compresses images in pull requests. Free and open-source alternative to [imgbot](https://imgbot.net/).
 
-Supports (PNG, JPG, WEBP, AVIF and SVG)
+Supports (SVG, PNG, JPG, GIF, WEBP, and AVIF)
 
 [View On GitHub Marketplace](https://github.com/marketplace/actions/image-optimizer-action)
 
@@ -13,6 +13,7 @@ This tool is completely free. If you enjoy the tool please help support us.
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/cadamsdev)
 
 # Table of Contents
+
 1. [Media](#media)
 2. [Usage](#usage)
 3. [Configuration](#configuration)
@@ -27,6 +28,7 @@ This tool is completely free. If you enjoy the tool please help support us.
 ## Pull request workflow
 
 Create file .github/workflows/image-optimizer.yml
+
 ```yml
 name: Compress Images
 
@@ -37,6 +39,7 @@ on:
       - '**/*.png'
       - '**/*.jpg'
       - '**/*.jpeg'
+      - '**/*.gif'
       - '**/*.webp'
       - '**/*.avif'
 
@@ -49,29 +52,40 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install SVGO CLI
+        run: npm install -g svgo
+
+      - name: Install Sharp CLI
+        run: npm install -g sharp-cli
+
       - name: Compress Images
         id: compress-images
-        uses: cadamsdev/image-optimizer-action@v1
+        uses: cadamsdev/image-optimizer-action-test@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Report Results
         if: steps.compress-images.outputs.terminal_report != ''
         run: echo "${{ steps.compress-images.outputs.terminal_report }}"
-
 ```
 
 ## Manual Workflow
 
 Create file .github/workflows/image-optimizer-manual.yml
+
 ```yml
 name: Compress Images (Manual)
 
-on:
-  workflow_dispatch
+on: workflow_dispatch
 
 jobs:
   build:
-    name: cadamsdev/image-optimizer-action
+    name: cadamsdev/image-optimizer-action-test
     permissions: write-all
     runs-on: ubuntu-latest
 
@@ -79,9 +93,20 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install SVGO CLI
+        run: npm install -g svgo
+
+      - name: Install Sharp CLI
+        run: npm install -g sharp-cli
+
       - name: Compress Images
         id: compress-images
-        uses: cadamsdev/image-optimizer-action@v1
+        uses: cadamsdev/image-optimizer-action-test@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Report Results
@@ -95,40 +120,39 @@ jobs:
           branch-suffix: timestamp
           commit-message: Compressed Images
           body: ${{ steps.compress-images.outputs.markdown_report }}
-
 ```
 
 # Configuration
 
 e.g
+
 ```yml
 with:
   github-token: ${{ secrets.GITHUB_TOKEN }}
   export-webp: true
   export-avif: true
+  replace-original-after-export-webp: true
   ignore-paths: |
     src/assets/images/some-dir/**
     src/assets/images/another-dir/**
-
 ```
 
-| Input         | Description                                  | Type              | Default         |
-|---------------|----------------------------------------------|-------------------|-----------------|
-| github-token  | The generated GitHub token                   | string (required) | ''              |
-| debug         | Enables verbose logging for easier debugging | boolean           | false           |
-| compress-png  | Enables compressing PNGs                     | boolean           | true            |
-| compress-svg  | Enables compressing SVGs                     | boolean           | true            |
-| compress-jpg  | Enables compressing JPG / JPEGs              | boolean           | true            |
-| compress-webp | Enables compressing WEBPs                    | boolean           | true            |
-| compress-avif | Enables compressing AVIFs                    | boolean           | true            |
-| export-webp   | Converts PNG, JPG / JPEG into WEBP           | boolean           | false           |
-| export-avif   | Converts PNG, JPG / JPEG, WEBP into AVIF     | boolean           | false           |
-| ignore-paths  | Paths of globs to prevent from processing    | string[]          | node_modules/** |
+| Input                              | Description                                       | Type              | Default           |
+| ---------------------------------- | ------------------------------------------------- | ----------------- | ----------------- |
+| github-token                       | The generated GitHub token                        | string (required) | ''                |
+| debug                              | Enables verbose logging for easier debugging      | boolean           | false             |
+| compress-png                       | Enables compressing PNGs                          | boolean           | true              |
+| compress-svg                       | Enables compressing SVGs                          | boolean           | true              |
+| compress-jpg                       | Enables compressing JPG / JPEGs                   | boolean           | true              |
+| compress-webp                      | Enables compressing WEBPs                         | boolean           | true              |
+| compress-avif                      | Enables compressing AVIFs                         | boolean           | true              |
+| export-webp                        | Converts PNG, JPG / JPEG into WEBP                | boolean           | false             |
+| export-avif                        | Converts PNG, JPG / JPEG, WEBP into AVIF          | boolean           | false             |
+| replace-original-after-export-webp | Replace original files after exporting WebP files | boolean           | false             |
+| ignore-paths                       | Paths of globs to prevent from processing         | string[]          | node_modules/\*\* |
 
 # Permissions
 
 Make sure to check "Allow GitHub Actions to create and approve pull requests" if you're using the manual workflow.
 
 ![Screenshot 2024-11-25 230654](https://github.com/user-attachments/assets/87e4e3c3-427d-427e-abba-5843b6d32f2f)
-
-

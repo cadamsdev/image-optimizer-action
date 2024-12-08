@@ -7,7 +7,6 @@
     "type-check": "tsc --noEmit",
     "start": "tsx src/index.ts",
     "build": "npm run type-check && esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js",
-    "release": "npm version patch && git push --follow-tags",
     "test": "tsx src/test.ts"
   },
   "author": "Chad Adams",

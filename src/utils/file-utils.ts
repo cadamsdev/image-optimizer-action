@@ -1,4 +1,4 @@
-import { statSync, copyFileSync, mkdirSync, rmSync } from 'fs';
+import { statSync, copyFileSync, mkdirSync, rmSync, unlink } from 'fs';
 import { EXPORT_AVIF, EXPORT_WEBP, IGNORE_PATHS, TEMP_DIR } from '../constants';
 import { OptimizedFileResult } from '../image-optimizer';
 import { log } from './logger-utils';
@@ -21,7 +21,7 @@ export function getPercentageChange(before: number, after?: number): number {
 }
 
 export function findAllFiles(dir: string): string[] {
-  log('IGNORE_PATHS')
+  log('IGNORE_PATHS');
   IGNORE_PATHS.forEach((path) => log(path));
 
   const ignorePatterns = IGNORE_PATHS.map((pattern) => `${dir}/${pattern}`);
@@ -40,7 +40,7 @@ export function copyFile(src: string, dest: string) {
   copyFileSync(src, dest);
 }
 
-export function moveSignificantFiles(
+export function moveSignificantFilesSync(
   significantFileChanges: OptimizedFileResult[]
 ) {
   for (const item of significantFileChanges) {
@@ -61,7 +61,7 @@ export function checkBeforeFileSizes(
   for (const fileName of tempImageFileNames) {
     const fileSizeBefore = statSync(fileName).size;
 
-    log(`temp image: ${fileName}, size: ${fileSizeBefore}`);
+    log(`temp image: ${fileName}, size: ${formatSize(fileSizeBefore)}`);
     const originalFileName = fileName.replace(`${TEMP_DIR}/`, '');
     dataMap.set(originalFileName, {
       fileName: originalFileName,
@@ -82,6 +82,7 @@ export function checkBeforeFileSizes(
         { flag: EXPORT_WEBP, extension: 'webp' },
         { flag: EXPORT_AVIF, extension: 'avif' },
       ],
+      gif: [{ flag: EXPORT_WEBP, extension: 'webp' }],
       webp: [{ flag: EXPORT_AVIF, extension: 'avif' }],
     };
 
@@ -115,6 +116,10 @@ export function checkFileSizesAfter(
   let changed = false;
   for (const item of dataMap.values()) {
     const tempFilename = `${TEMP_DIR}/${item.fileName}`;
+    if (!statSync(tempFilename)) {
+      continue;
+    }
+
     const fileSize = statSync(tempFilename).size;
     item.fileSizeAfter = fileSize;
     const percentageChange = getPercentageChange(item.fileSizeBefore, fileSize);
@@ -126,4 +131,17 @@ export function checkFileSizesAfter(
   }
 
   return changed;
+}
+
+export async function deleteFiles(filePaths: string[]) {
+  const deletePromises = filePaths.map((file) => {
+    return unlink(file, () => {});
+  });
+  await Promise.all(deletePromises);
+}
+
+export function copyFilesToTempDirSync(filePaths: string[]) {
+  for (const filePath of filePaths) {
+    copyFile(filePath, `${TEMP_DIR}/${filePath}`);
+  }
 }

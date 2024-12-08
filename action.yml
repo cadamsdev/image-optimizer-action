@@ -1,9 +1,6 @@
 name: 'Image Optimizer Action'
 description: 'A GitHub Action to optimize images'
 author: 'Chad Adams'
-branding:
-  icon: 'image'
-  color: 'white'
 
 inputs:
   github-token:
@@ -21,6 +18,9 @@ inputs:
   compress-jpg:
     description: "Compress JPG files"
     required: false
+  compress-gif:
+    description: "Compress GIF files"
+    required: false
   compress-webp:
     description: "Compress WebP files"
     required: false
@@ -33,6 +33,9 @@ inputs:
   export-avif:
     description: "Export AVIF files"
     required: false
+  replace-original-after-export-webp:
+    description: "Replace original files after exporting WebP files"
+    required: false
   ignore-paths:
     description: "Paths to ignore"
     required: false
@@ -40,4 +43,4 @@ inputs:
 
 runs:
   using: 'node20'
-  main: './dist/index.js'
+  main: 'dist/index.js'

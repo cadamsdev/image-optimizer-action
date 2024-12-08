@@ -4,7 +4,7 @@ import { getEventData } from './api/github';
 
 export async function main(): Promise<void> {
   try {
-    if (!GITHUB_TOKEN)  {
+    if (!GITHUB_TOKEN) {
       setFailed('GitHub token is required');
       return;
     }

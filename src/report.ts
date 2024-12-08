@@ -11,7 +11,9 @@ export interface ReportData {
   terminalReport: string;
 }
 
-export async function generateReport(data: OptimizedFileResult[]): Promise<ReportData> {
+export async function generateReport(
+  data: OptimizedFileResult[]
+): Promise<ReportData> {
   const sortedData = Array.from(data).sort((a, b) => {
     return a.fileName.localeCompare(b.fileName);
   });
@@ -30,10 +32,13 @@ export async function generateReport(data: OptimizedFileResult[]): Promise<Repor
   return { markdownReport, terminalReport };
 }
 
-async function generateMarkdownReport(data: OptimizedFileResult[], totalSaved: number): Promise<string> {
-  const description = `Optimized <b>${
-    data.length
-  }</b> images, saved <b>${formatSize(totalSaved)}</b> in total.\n\n`;
+async function generateMarkdownReport(
+  data: OptimizedFileResult[],
+  totalSaved: number
+): Promise<string> {
+  const description = `Optimized <b>${data.length}</b> ${
+    data.length > 1 ? 'images' : 'image'
+  }, saved <b>${formatSize(totalSaved)}</b> in total.\n\n`;
   const header = `| Filename | Before | After | Difference |\n| ---- | ------ | ----- | ----------- |\n`;
   const rows = data
     .map(
@@ -48,7 +53,10 @@ async function generateMarkdownReport(data: OptimizedFileResult[], totalSaved: n
   return markdown;
 }
 
-async function generateTerminalReport(data: OptimizedFileResult[], totalSaved: number): Promise<string> {
+async function generateTerminalReport(
+  data: OptimizedFileResult[],
+  totalSaved: number
+): Promise<string> {
   const columns = ['Filename', 'Before', 'After', 'Difference'];
   const rows = data.map((item) => [
     item.fileName,
@@ -71,7 +79,10 @@ async function generateTerminalReport(data: OptimizedFileResult[], totalSaved: n
   return terminalReport;
 }
 
-async function generateShortMarkdownReport(data: OptimizedFileResult[], totalSaved: number): Promise<string> {
+async function generateShortMarkdownReport(
+  data: OptimizedFileResult[],
+  totalSaved: number
+): Promise<string> {
   const jobUrl = await getJobUrl();
   log(`runUrl=${jobUrl}`);
   const description = `Optimized <b>${
