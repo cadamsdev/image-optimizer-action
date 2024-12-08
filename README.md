@@ -66,7 +66,7 @@ jobs:
 
       - name: Compress Images
         id: compress-images
-        uses: cadamsdev/image-optimizer-action-test@v1
+        uses: cadamsdev/image-optimizer-action@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Report Results
@@ -85,7 +85,7 @@ on: workflow_dispatch
 
 jobs:
   build:
-    name: cadamsdev/image-optimizer-action-test
+    name: cadamsdev/image-optimizer-action
     permissions: write-all
     runs-on: ubuntu-latest
 
@@ -106,7 +106,7 @@ jobs:
 
       - name: Compress Images
         id: compress-images
-        uses: cadamsdev/image-optimizer-action-test@main
+        uses: cadamsdev/image-optimizer-action@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Report Results
