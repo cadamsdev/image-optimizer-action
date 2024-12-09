@@ -1,7 +1,7 @@
 import { PR_BODY_CHAR_LIMIT } from './constants';
 import { OptimizedFileResult } from './image-optimizer';
 import { formatSize } from './utils/file-utils';
-import { setOutput } from '@actions/core';
+import { info, setOutput } from '@actions/core';
 import { table } from 'table';
 import { log } from './utils/logger-utils';
 import { getJobUrl } from './api/github';
@@ -69,13 +69,13 @@ async function generateTerminalReport(
   const terminalTableOutput = table(dataForTable);
 
   const terminalReport =
-    `Optimized ${data.length} images, saved ${formatSize(
-      totalSaved
-    )} in total` +
+    `Optimized ${data.length} ${
+      data.length > 1 ? 'images' : 'image'
+    }, saved ${formatSize(totalSaved)} in total` +
     '\n' +
     terminalTableOutput;
 
-  setOutput('terminal_report', terminalReport);
+  info(terminalReport);
   return terminalReport;
 }
 

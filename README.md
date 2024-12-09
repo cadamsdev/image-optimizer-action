@@ -69,20 +69,11 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install SVGO CLI
-        run: npm install -g svgo
-
-      - name: Install Sharp CLI
-        run: npm install -g sharp-cli
-
       - name: Compress Images
         id: compress-images
         uses: cadamsdev/image-optimizer-action@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Report Results
-        if: steps.compress-images.outputs.terminal_report != ''
-        run: echo "${{ steps.compress-images.outputs.terminal_report }}"
 ```
 
 ### Manual Workflow
@@ -109,20 +100,12 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install SVGO CLI
-        run: npm install -g svgo
-
-      - name: Install Sharp CLI
-        run: npm install -g sharp-cli
-
       - name: Compress Images
         id: compress-images
         uses: cadamsdev/image-optimizer-action@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Report Results
-        if: steps.compress-images.outputs.terminal_report != ''
-        run: echo "${{ steps.compress-images.outputs.terminal_report }}"
+
       - name: Create New Pull Request If Needed
         if: steps.compress-images.outputs.markdown_report != ''
         uses: peter-evans/create-pull-request@v5

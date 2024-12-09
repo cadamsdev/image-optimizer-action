@@ -108,7 +108,7 @@ async function processSvgs(svgFileNames: string[]) {
   }
 
   try {
-    await exec(`svgo --multipass -r ${TEMP_DIR}`);
+    await exec(`npx svgo --multipass -r ${TEMP_DIR}`);
   } catch (error) {
     console.error(`Error processing svgs:`, error);
   }
@@ -121,7 +121,7 @@ async function processWebp(webpFileNames: string[]) {
 
   if (EXPORT_AVIF) {
     try {
-      await exec(`sharp -i ${TEMP_DIR}/**/*.webp -f avif -o {dir}`);
+      await exec(`npx sharp-cli -i ${TEMP_DIR}/**/*.webp -f avif -o {dir}`);
     } catch (error) {
       console.error(`Error exporting avifs:`, error);
     }
@@ -130,7 +130,7 @@ async function processWebp(webpFileNames: string[]) {
   if (COMPRESS_WEBP) {
     try {
       await exec(
-        `sharp -i ${TEMP_DIR}/**/*.webp -o {dir} --animated --nearLossless`
+        `npx sharp-cli -i ${TEMP_DIR}/**/*.webp -o {dir} --animated --nearLossless`
       );
     } catch (error) {
       console.error(`Error exporting webps:`, error);
@@ -145,7 +145,7 @@ async function processAvif(avifFileNames: string[]) {
 
   if (COMPRESS_AVIF) {
     try {
-      await exec(`sharp -i ${TEMP_DIR}/**/*.avif -o {dir}`);
+      await exec(`npx sharp-cli -i ${TEMP_DIR}/**/*.avif -o {dir}`);
     } catch (error) {
       console.error(`Error exporting avifs:`, error);
     }
@@ -159,7 +159,7 @@ async function processJpgs(jpgFiles: string[]) {
 
   if (EXPORT_WEBP) {
     try {
-      await exec(`sharp -i ${TEMP_DIR}/**/*.{jpg,jpeg} -f webp -o {dir}`);
+      await exec(`npx sharp-cli -i ${TEMP_DIR}/**/*.{jpg,jpeg} -f webp -o {dir}`);
     } catch (error) {
       console.error(`Error converting jpg into webp:`, error);
     }
@@ -167,7 +167,7 @@ async function processJpgs(jpgFiles: string[]) {
 
   if (EXPORT_AVIF) {
     try {
-      await exec(`sharp -i ${TEMP_DIR}/**/*.{jpg,jpeg} -f avif -o {dir}`);
+      await exec(`npx sharp-cli -i ${TEMP_DIR}/**/*.{jpg,jpeg} -f avif -o {dir}`);
     } catch (error) {
       console.error(`Error converting jpg avif:`, error);
     }
@@ -183,7 +183,7 @@ async function processJpgs(jpgFiles: string[]) {
   } else if (COMPRESS_JPG) {
     try {
       await exec(
-        `sharp -i ${TEMP_DIR}/**/*.{jpg,jpeg} -f jpg -o {dir} --progressive`
+        `npx sharp-cli -i ${TEMP_DIR}/**/*.{jpg,jpeg} -f jpg -o {dir} --progressive`
       );
     } catch (error) {
       console.error(`Error exporting jpgs:`, error);
@@ -198,7 +198,7 @@ async function processPngs(pngFiles: string[]) {
 
   if (EXPORT_WEBP) {
     try {
-      await exec(`sharp -i ${TEMP_DIR}/**/*.png -f webp -o {dir}`);
+      await exec(`npx sharp-cli -i ${TEMP_DIR}/**/*.png -f webp -o {dir}`);
     } catch (error) {
       console.error(`Error exporting webps:`, error);
     }
@@ -206,7 +206,7 @@ async function processPngs(pngFiles: string[]) {
 
   if (EXPORT_AVIF) {
     try {
-      await exec(`sharp -i ${TEMP_DIR}/**/*.png -f avif -o {dir}`);
+      await exec(`npx sharp-cli -i ${TEMP_DIR}/**/*.png -f avif -o {dir}`);
     } catch (error) {
       console.error(`Error exporting avifs:`, error);
     }
@@ -221,7 +221,7 @@ async function processPngs(pngFiles: string[]) {
     }
   } else if (COMPRESS_PNG) {
     try {
-      await exec(`sharp -i ${TEMP_DIR}/**/*.png -o {dir}`);
+      await exec(`npx sharp-cli -i ${TEMP_DIR}/**/*.png -o {dir}`);
     } catch (error) {
       console.error(`Error processing pngs:`, error);
     }
@@ -236,7 +236,7 @@ async function processGifs(gifFiles: string[]) {
   if (EXPORT_WEBP) {
     try {
       await exec(
-        `sharp -i ${TEMP_DIR}/**/*.gif -f webp -o {dir} --animated --nearLossless`
+        `npx sharp-cli -i ${TEMP_DIR}/**/*.gif -f webp -o {dir} --animated --nearLossless`
       );
     } catch (error) {
       console.error(`Error exporting webps:`, error);
@@ -253,7 +253,7 @@ async function processGifs(gifFiles: string[]) {
   } else if (COMPRESS_GIF) {
     try {
       await exec(
-        `sharp -i ${TEMP_DIR}/**/*.gif -o {dir} --animated --nearLossless`
+        `npx sharp-cli -i ${TEMP_DIR}/**/*.gif -o {dir} --animated --nearLossless`
       );
     } catch (error) {
       console.error(`Error processing gifs:`, error);
