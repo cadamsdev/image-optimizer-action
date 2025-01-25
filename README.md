@@ -64,11 +64,6 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
       - name: Compress Images
         id: compress-images
         uses: cadamsdev/image-optimizer-action@v1
@@ -94,11 +89,6 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
 
       - name: Compress Images
         id: compress-images

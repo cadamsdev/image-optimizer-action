@@ -1,23 +1,9 @@
 import { log } from '../utils/logger-utils';
-import {
-  getFileNamesToCompress,
-  getImageProcessorConfig,
-  OptimizedFileResult,
-  processImages,
-} from '../image-optimizer';
+import { getImageProcessorConfig, processImages } from '../image-optimizer';
 import { createPRComment, getPRFileNames } from '../api/github';
-import { TEMP_DIR } from '../constants';
-import {
-  checkBeforeFileSizes,
-  checkFileSizesAfter,
-  copyFilesToTempDirSync,
-  moveSignificantFilesSync,
-} from '../utils/file-utils';
 import { setFailed } from '@actions/core';
 import { generateReport } from '../report';
 import { checkoutBranch, commitAndPush, setupGitConfig } from '../api/git';
-
-const dataMap = new Map<string, OptimizedFileResult>();
 
 export async function run() {
   log('Running pull request');
@@ -34,35 +20,17 @@ export async function run() {
 
   const allFiles = await getPRFileNames();
   const ipConfig = getImageProcessorConfig(allFiles);
-  const fileNamesToCompress = getFileNamesToCompress(ipConfig);
-  if (!fileNamesToCompress.length) {
-    log('No images to optimize');
+
+  log(`Optimizing ${ipConfig.imagesToCompress.length} images`);
+
+  const results = await processImages(ipConfig);
+
+  if (results.length === 0) {
+    log('No images optimized');
     return;
   }
 
-  log(`Optimizing ${fileNamesToCompress.length} images`);
-  copyFilesToTempDirSync(fileNamesToCompress);
-
-  const tempImageFileNames = fileNamesToCompress.map(
-    (file) => `${TEMP_DIR}/${file}`
-  );
-
-  await checkBeforeFileSizes(dataMap, tempImageFileNames);
-  await processImages(ipConfig);
-
-  const changed = checkFileSizesAfter(dataMap);
-  if (!changed) {
-    log('No changes in file sizes');
-    return;
-  }
-
-  const significantFileChanges = Array.from(dataMap.values()).filter(
-    (item) => item.isChangeSignificant
-  );
-
-  moveSignificantFilesSync(significantFileChanges);
-
-  const { markdownReport } = await generateReport(significantFileChanges);
+  const { markdownReport } = await generateReport(results);
   await commitAndPush(branchName);
 
   if (markdownReport) {

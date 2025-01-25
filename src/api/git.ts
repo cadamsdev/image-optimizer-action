@@ -1,4 +1,4 @@
-import { log } from "../utils/logger-utils";
+import { log } from '../utils/logger-utils';
 import { exec } from '@actions/exec';
 
 export async function setupGitConfig() {
@@ -6,6 +6,7 @@ export async function setupGitConfig() {
   await exec(
     'git config --global user.email 41898282+github-actions[bot]@users.noreply.github.com'
   );
+  await exec('git config --global --add safe.directory /github/workspace');
 }
 
 export async function checkoutBranch(branchName: string) {

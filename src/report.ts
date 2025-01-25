@@ -1,7 +1,7 @@
 import { PR_BODY_CHAR_LIMIT } from './constants';
 import { OptimizedFileResult } from './image-optimizer';
 import { formatSize } from './utils/file-utils';
-import { info, setOutput } from '@actions/core';
+import { setOutput, info } from '@actions/core';
 import { table } from 'table';
 import { log } from './utils/logger-utils';
 import { getJobUrl } from './api/github';

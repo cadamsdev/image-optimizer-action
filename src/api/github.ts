@@ -16,7 +16,7 @@ export function getEventData() {
     issue_number: prNumber,
     isWorkflowDispatch,
   };
-} 
+}
 
 export async function getPRComments() {
   const eventData = getEventData();
@@ -35,6 +35,7 @@ export async function getPRFileNames() {
     owner: eventData.owner,
     repo: eventData.repo,
     pull_number: eventData.issue_number,
+    per_page: 3000, // 3000 is the max limit
   });
 
   const fileNames = files.map(({ filename }) => filename);
@@ -76,5 +77,5 @@ async function getJobId() {
     repo: context.repo.repo,
     run_id: context.runId,
   });
-  return data.jobs[0].id;  
+  return data.jobs[0].id;
 }

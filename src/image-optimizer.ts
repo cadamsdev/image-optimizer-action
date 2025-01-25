@@ -8,11 +8,12 @@ import {
   EXPORT_AVIF,
   EXPORT_WEBP,
   REPLACE_ORIGINAL_AFTER_EXPORT_WEBP,
-  TEMP_DIR,
 } from './constants';
-import { exec } from '@actions/exec';
-import { deleteFiles } from './utils/file-utils';
 import { log } from './utils/logger-utils';
+import sharp from 'sharp';
+import { optimize } from 'svgo';
+import { readFileSync, unlinkSync, writeFileSync } from 'fs';
+import { getPercentageChange } from './utils/file-utils';
 
 export interface OptimizedFileResult {
   fileName: string;
@@ -23,240 +24,466 @@ export interface OptimizedFileResult {
 }
 
 export interface ImageProcessorConfig {
-  jpgFileNames: string[];
-  pngFileNames: string[];
-  gifFileNames: string[];
-  svgFileNames: string[];
-  webpFileNames: string[];
-  avifFileNames: string[];
+  imagesToCompress: string[];
 }
 
 export async function processImages({
-  svgFileNames,
-  avifFileNames,
-  webpFileNames,
-  jpgFileNames,
-  pngFileNames,
-  gifFileNames,
-}: ImageProcessorConfig) {
-  await processSvgs(svgFileNames);
-  await processAvif(avifFileNames);
-  await processWebp(webpFileNames);
-  await processJpgs(jpgFileNames);
-  await processPngs(pngFileNames);
-  await processGifs(gifFileNames);
+  imagesToCompress,
+}: ImageProcessorConfig): Promise<OptimizedFileResult[]> {
+  const results: OptimizedFileResult[] = [];
+  for (let imageFileName of imagesToCompress) {
+    const extension = imageFileName.substring(
+      imageFileName.lastIndexOf('.') + 1
+    );
+    switch (extension) {
+      case 'svg':
+        const svgResult = processSvg(imageFileName);
+        if (svgResult) {
+          results.push(svgResult);
+        }
+        break;
+
+      case 'gif':
+        const gifResults = await processGif(imageFileName);
+        results.push(...gifResults);
+        break;
+
+      case 'png':
+        const pngResults = await processPng(imageFileName);
+        results.push(...pngResults);
+        break;
+
+      case 'jpg':
+      case 'jpeg':
+        const jpgResults = await processJpg(imageFileName);
+        results.push(...jpgResults);
+        break;
+
+      case 'webp':
+        const webpResults = await processWebp(imageFileName);
+        results.push(...webpResults);
+        break;
+
+      case 'avif':
+        const avifResult = await processAvif(imageFileName);
+        if (avifResult) {
+          results.push(avifResult);
+        }
+        break;
+    }
+  }
+  return results;
 }
 
-export function getImageProcessorConfig(allFiles: string[]) {
-  const svgFileNames = allFiles.filter((filename) => filename.endsWith('.svg'));
-  const pngFileNames = allFiles.filter((filename) => filename.endsWith('.png'));
-  const jpgFileNames = allFiles.filter(
-    (filename) => filename.endsWith('.jpg') || filename.endsWith('.jpeg')
-  );
-  const webpFileNames = allFiles.filter((filename) =>
-    filename.endsWith('.webp')
-  );
-  const avifFileNames = allFiles.filter((filename) =>
-    filename.endsWith('.avif')
-  );
-  const gifFileNames = allFiles.filter((filename) => filename.endsWith('.gif'));
+export function getImageProcessorConfig(
+  allFiles: string[]
+): ImageProcessorConfig {
+  let svgCount = 0;
+  let pngCount = 0;
+  let jpgCount = 0;
+  let gifCount = 0;
+  let webpCount = 0;
+  let avifCount = 0;
 
-  log(`SVG files: ${svgFileNames.length}`);
-  log(`PNG files: ${pngFileNames.length}`);
-  log(`JPG files: ${jpgFileNames.length}`);
-  log(`WEBP files: ${webpFileNames.length}`);
-  log(`AVIF files: ${avifFileNames.length}`);
-  log(`GIF files: ${gifFileNames.length}`);
+  const imagesToCompress: string[] = [];
+
+  allFiles.forEach((fileName) => {
+    if (COMPRESS_SVG && fileName.endsWith('.svg')) {
+      imagesToCompress.push(fileName);
+      svgCount++;
+    } else if (COMPRESS_PNG && fileName.endsWith('.png')) {
+      imagesToCompress.push(fileName);
+      pngCount++;
+    } else if (
+      COMPRESS_JPG &&
+      (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg'))
+    ) {
+      imagesToCompress.push(fileName);
+      jpgCount++;
+    } else if (COMPRESS_GIF && fileName.endsWith('.gif')) {
+      imagesToCompress.push(fileName);
+      gifCount++;
+    } else if (COMPRESS_WEBP && fileName.endsWith('.webp')) {
+      imagesToCompress.push(fileName);
+      webpCount++;
+    } else if (COMPRESS_AVIF && fileName.endsWith('.avif')) {
+      imagesToCompress.push(fileName);
+      avifCount++;
+    }
+  });
+
+  log(`SVG files: ${svgCount}`);
+  log(`PNG files: ${pngCount}`);
+  log(`JPG files: ${jpgCount}`);
+  log(`GIF files: ${gifCount}`);
+  log(`WEBP files: ${webpCount}`);
+  log(`AVIF files: ${avifCount}`);
 
   return {
-    jpgFileNames,
-    pngFileNames,
-    gifFileNames,
-    svgFileNames,
-    webpFileNames,
-    avifFileNames,
+    imagesToCompress,
   };
 }
 
-export function getFileNamesToCompress(config: ImageProcessorConfig): string[] {
-  const allImageFileNames: string[] = [];
-  const compressionMappings = [
-    { flag: COMPRESS_SVG, fileNames: config.svgFileNames },
-    { flag: COMPRESS_PNG, fileNames: config.pngFileNames },
-    { flag: COMPRESS_JPG, fileNames: config.jpgFileNames },
-    { flag: COMPRESS_WEBP, fileNames: config.webpFileNames },
-    { flag: COMPRESS_AVIF, fileNames: config.avifFileNames },
-    { flag: COMPRESS_GIF, fileNames: config.gifFileNames },
-  ];
-
-  for (const { flag, fileNames } of compressionMappings) {
-    if (flag) {
-      allImageFileNames.push(...fileNames);
-    }
-  }
-
-  return allImageFileNames;
-}
-
-async function processSvgs(svgFileNames: string[]) {
-  if (!svgFileNames.length) {
-    return;
-  }
-
+function processSvg(svgFileName: string): OptimizedFileResult | undefined {
   if (!COMPRESS_SVG) {
     return;
   }
 
-  try {
-    await exec(`npx svgo --multipass -r ${TEMP_DIR}`);
-  } catch (error) {
-    console.error(`Error processing svgs:`, error);
-  }
-}
+  const svgContent = readFileSync(svgFileName, 'utf8');
+  const sizeBefore = Buffer.byteLength(svgContent, 'utf8');
+  const optimizedSvg = optimize(svgContent, {
+    path: svgFileName,
+    multipass: true,
+  });
+  const sizeAfter = Buffer.byteLength(optimizedSvg.data, 'utf8');
+  const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
+  const isChangeSignificant = percentageChange < -1;
 
-async function processWebp(webpFileNames: string[]) {
-  if (!webpFileNames.length) {
+  if (!isChangeSignificant) {
     return;
   }
 
-  if (EXPORT_AVIF) {
-    try {
-      await exec(`npx sharp-cli -i ${TEMP_DIR}/**/*.webp -f avif -o {dir}`);
-    } catch (error) {
-      console.error(`Error exporting avifs:`, error);
-    }
-  }
+  writeFileSync(svgFileName, optimizedSvg.data);
+  return {
+    fileName: svgFileName,
+    fileSizeBefore: sizeBefore,
+    fileSizeAfter: sizeAfter,
+    percentageChange,
+    isChangeSignificant,
+  };
+}
+
+async function processWebp(
+  webpFileName: string
+): Promise<OptimizedFileResult[]> {
+  const webpFileData = readFileSync(webpFileName);
+  const sizeBefore = webpFileData.byteLength;
+  const results: OptimizedFileResult[] = [];
 
   if (COMPRESS_WEBP) {
-    try {
-      await exec(
-        `npx sharp-cli -i ${TEMP_DIR}/**/*.webp -o {dir} --animated --nearLossless`
-      );
-    } catch (error) {
-      console.error(`Error exporting webps:`, error);
-    }
-  }
-}
+    const { data, info } = await sharp(webpFileData)
+      .webp({
+        nearLossless: true,
+      })
+      .toBuffer({
+        resolveWithObject: true,
+      });
 
-async function processAvif(avifFileNames: string[]) {
-  if (!avifFileNames.length) {
-    return;
-  }
+    const sizeAfter = info.size;
+    const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
+    const isChangeSignificant = percentageChange < -1;
 
-  if (COMPRESS_AVIF) {
-    try {
-      await exec(`npx sharp-cli -i ${TEMP_DIR}/**/*.avif -o {dir}`);
-    } catch (error) {
-      console.error(`Error exporting avifs:`, error);
-    }
-  }
-}
-
-async function processJpgs(jpgFiles: string[]) {
-  if (!jpgFiles.length) {
-    return;
-  }
-
-  if (EXPORT_WEBP) {
-    try {
-      await exec(`npx sharp-cli -i ${TEMP_DIR}/**/*.{jpg,jpeg} -f webp -o {dir}`);
-    } catch (error) {
-      console.error(`Error converting jpg into webp:`, error);
+    if (isChangeSignificant) {
+      writeFileSync(webpFileName, data);
+      results.push({
+        fileName: webpFileName,
+        fileSizeBefore: sizeBefore,
+        fileSizeAfter: sizeAfter,
+        percentageChange,
+        isChangeSignificant,
+      });
     }
   }
 
   if (EXPORT_AVIF) {
-    try {
-      await exec(`npx sharp-cli -i ${TEMP_DIR}/**/*.{jpg,jpeg} -f avif -o {dir}`);
-    } catch (error) {
-      console.error(`Error converting jpg avif:`, error);
+    const { data, info } = await sharp(webpFileData)
+      .avif({
+        lossless: true,
+      })
+      .toBuffer({
+        resolveWithObject: true,
+      });
+
+    const sizeAfter = info.size;
+    const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
+    const isChangeSignificant = percentageChange < -1;
+    const newFileName = webpFileName.replace('.webp', '.avif');
+
+    if (isChangeSignificant) {
+      writeFileSync(newFileName, data);
+      results.push({
+        fileName: newFileName,
+        fileSizeBefore: sizeBefore,
+        fileSizeAfter: sizeAfter,
+        percentageChange,
+        isChangeSignificant,
+      });
     }
   }
 
-  if (EXPORT_WEBP && REPLACE_ORIGINAL_AFTER_EXPORT_WEBP) {
-    try {
-      log('Deleting original jpgs');
-      await deleteFiles(jpgFiles);
-    } catch (error) {
-      console.error(`Error deleting original jpgs:`, error);
-    }
-  } else if (COMPRESS_JPG) {
-    try {
-      await exec(
-        `npx sharp-cli -i ${TEMP_DIR}/**/*.{jpg,jpeg} -f jpg -o {dir} --progressive`
-      );
-    } catch (error) {
-      console.error(`Error exporting jpgs:`, error);
-    }
-  }
+  return results;
 }
 
-async function processPngs(pngFiles: string[]) {
-  if (!pngFiles.length) {
+async function processAvif(
+  avifFileName: string
+): Promise<OptimizedFileResult | undefined> {
+  if (!COMPRESS_AVIF) {
     return;
   }
 
+  const avifFileData = readFileSync(avifFileName);
+  const sizeBefore = avifFileData.byteLength;
+
+  const { data, info } = await sharp(avifFileData)
+    .avif({
+      lossless: true,
+    })
+    .toBuffer({
+      resolveWithObject: true,
+    });
+
+  const sizeAfter = info.size;
+  const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
+  const isChangeSignificant = percentageChange < -1;
+
+  if (!isChangeSignificant) {
+    return;
+  }
+
+  writeFileSync(avifFileName, data);
+  return {
+    fileName: avifFileName,
+    fileSizeBefore: sizeBefore,
+    fileSizeAfter: sizeAfter,
+    percentageChange,
+    isChangeSignificant,
+  };
+}
+
+async function processJpg(jpgFileName: string): Promise<OptimizedFileResult[]> {
+  const jpgFileData = readFileSync(jpgFileName);
+  const sizeBefore = jpgFileData.byteLength;
+  const results: OptimizedFileResult[] = [];
+
+  if (COMPRESS_JPG && !REPLACE_ORIGINAL_AFTER_EXPORT_WEBP) {
+    const { data, info } = await sharp(jpgFileData).jpeg().toBuffer({
+      resolveWithObject: true,
+    });
+
+    const sizeAfter = info.size;
+    const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
+    const isChangeSignificant = percentageChange < -1;
+
+    if (isChangeSignificant) {
+      writeFileSync(jpgFileName, data);
+      results.push({
+        fileName: jpgFileName,
+        fileSizeBefore: sizeBefore,
+        fileSizeAfter: sizeAfter,
+        percentageChange,
+        isChangeSignificant,
+      });
+    }
+  }
+
   if (EXPORT_WEBP) {
-    try {
-      await exec(`npx sharp-cli -i ${TEMP_DIR}/**/*.png -f webp -o {dir}`);
-    } catch (error) {
-      console.error(`Error exporting webps:`, error);
+    const { data, info } = await sharp(jpgFileData)
+      .webp({
+        nearLossless: true,
+      })
+      .toBuffer({
+        resolveWithObject: true,
+      });
+
+    const sizeAfter = info.size;
+    const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
+    const isChangeSignificant = percentageChange < -1;
+    const newFileName = jpgFileName.replace('.jpg', '.webp');
+
+    if (isChangeSignificant) {
+      writeFileSync(newFileName, data);
+
+      if (REPLACE_ORIGINAL_AFTER_EXPORT_WEBP) {
+        unlinkSync(jpgFileName);
+      }
+
+      results.push({
+        fileName: newFileName,
+        fileSizeBefore: sizeBefore,
+        fileSizeAfter: sizeAfter,
+        percentageChange,
+        isChangeSignificant,
+      });
     }
   }
 
   if (EXPORT_AVIF) {
-    try {
-      await exec(`npx sharp-cli -i ${TEMP_DIR}/**/*.png -f avif -o {dir}`);
-    } catch (error) {
-      console.error(`Error exporting avifs:`, error);
-    }
-  }
+    const { data, info } = await sharp(jpgFileData)
+      .avif({
+        lossless: true,
+      })
+      .toBuffer({
+        resolveWithObject: true,
+      });
 
-  if (EXPORT_WEBP && REPLACE_ORIGINAL_AFTER_EXPORT_WEBP) {
-    try {
-      log('Deleting original pngs');
-      await deleteFiles(pngFiles);
-    } catch (error) {
-      console.error(`Error deleting original pngs:`, error);
-    }
-  } else if (COMPRESS_PNG) {
-    try {
-      await exec(`npx sharp-cli -i ${TEMP_DIR}/**/*.png -o {dir}`);
-    } catch (error) {
-      console.error(`Error processing pngs:`, error);
+    const sizeAfter = info.size;
+    const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
+    const isChangeSignificant = percentageChange < -1;
+    const newFileName = jpgFileName.replace('.jpg', '.avif');
+
+    if (isChangeSignificant) {
+      writeFileSync(newFileName, data);
+      results.push({
+        fileName: newFileName,
+        fileSizeBefore: sizeBefore,
+        fileSizeAfter: sizeAfter,
+        percentageChange,
+        isChangeSignificant,
+      });
     }
   }
+  return results;
 }
 
-async function processGifs(gifFiles: string[]) {
-  if (!gifFiles.length) {
-    return;
+async function processPng(pngFileName: string): Promise<OptimizedFileResult[]> {
+  if (!COMPRESS_PNG) {
+    return [];
+  }
+
+  const results: OptimizedFileResult[] = [];
+  const pngFileData = readFileSync(pngFileName);
+  const sizeBefore = pngFileData.byteLength;
+
+  if (COMPRESS_PNG && !REPLACE_ORIGINAL_AFTER_EXPORT_WEBP) {
+    const { data, info } = await sharp(pngFileData).png().toBuffer({
+      resolveWithObject: true,
+    });
+
+    const sizeAfter = info.size;
+    const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
+    const isChangeSignificant = percentageChange < -1;
+
+    if (isChangeSignificant) {
+      results.push({
+        fileName: pngFileName,
+        fileSizeBefore: sizeBefore,
+        fileSizeAfter: sizeAfter,
+        percentageChange,
+        isChangeSignificant,
+      });
+
+      writeFileSync(pngFileName, data);
+    }
   }
 
   if (EXPORT_WEBP) {
-    try {
-      await exec(
-        `npx sharp-cli -i ${TEMP_DIR}/**/*.gif -f webp -o {dir} --animated --nearLossless`
-      );
-    } catch (error) {
-      console.error(`Error exporting webps:`, error);
+    const { data, info } = await sharp(pngFileData)
+      .webp({
+        nearLossless: true,
+      })
+      .toBuffer({
+        resolveWithObject: true,
+      });
+
+    const sizeAfter = info.size;
+    const percentageChange = ((sizeBefore - sizeAfter) / sizeBefore) * 100;
+    const isChangeSignificant = percentageChange < -1;
+    const newFileName = pngFileName.replace('.png', '.webp');
+
+    if (isChangeSignificant) {
+      writeFileSync(newFileName, data);
+
+      if (REPLACE_ORIGINAL_AFTER_EXPORT_WEBP) {
+        unlinkSync(pngFileName);
+      }
+
+      results.push({
+        fileName: newFileName,
+        fileSizeBefore: sizeBefore,
+        fileSizeAfter: sizeAfter,
+        percentageChange,
+        isChangeSignificant,
+      });
     }
   }
 
-  if (EXPORT_WEBP && REPLACE_ORIGINAL_AFTER_EXPORT_WEBP) {
-    try {
-      log('Deleting original gifs');
-      await deleteFiles(gifFiles);
-    } catch (error) {
-      console.error(`Error deleting original gifs:`, error);
-    }
-  } else if (COMPRESS_GIF) {
-    try {
-      await exec(
-        `npx sharp-cli -i ${TEMP_DIR}/**/*.gif -o {dir} --animated --nearLossless`
-      );
-    } catch (error) {
-      console.error(`Error processing gifs:`, error);
+  if (EXPORT_AVIF) {
+    const { data, info } = await sharp(pngFileData)
+      .avif({
+        lossless: true,
+      })
+      .toBuffer({
+        resolveWithObject: true,
+      });
+
+    const sizeAfter = info.size;
+    const percentageChange = ((sizeBefore - sizeAfter) / sizeBefore) * 100;
+    const isChangeSignificant = percentageChange < -1;
+    const newFileName = pngFileName.replace('.png', '.avif');
+
+    if (isChangeSignificant) {
+      results.push({
+        fileName: newFileName,
+        fileSizeBefore: sizeBefore,
+        fileSizeAfter: sizeAfter,
+        percentageChange,
+        isChangeSignificant,
+      });
+
+      writeFileSync(newFileName, data);
     }
   }
+
+  return results;
+}
+
+async function processGif(gifFileName: string): Promise<OptimizedFileResult[]> {
+  const gifFileData = readFileSync(gifFileName);
+  const sizeBefore = gifFileData.byteLength;
+  const results: OptimizedFileResult[] = [];
+
+  if (COMPRESS_GIF && !REPLACE_ORIGINAL_AFTER_EXPORT_WEBP) {
+    const { data, info } = await sharp(gifFileData, { animated: true })
+      .gif()
+      .toBuffer({
+        resolveWithObject: true,
+      });
+
+    const sizeAfter = info.size;
+    const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
+    const isChangeSignificant = percentageChange < -1;
+
+    if (isChangeSignificant) {
+      writeFileSync(gifFileName, data);
+      results.push({
+        fileName: gifFileName,
+        fileSizeBefore: sizeBefore,
+        fileSizeAfter: sizeAfter,
+        percentageChange,
+        isChangeSignificant,
+      });
+    }
+  }
+
+  if (EXPORT_WEBP) {
+    const { data, info } = await sharp(gifFileData, { animated: true })
+      .webp({
+        nearLossless: true,
+      })
+      .toBuffer({
+        resolveWithObject: true,
+      });
+
+    const sizeAfter = info.size;
+    const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
+    const isChangeSignificant = percentageChange < -1;
+    const newFileName = gifFileName.replace('.gif', '.webp');
+
+    if (isChangeSignificant) {
+      writeFileSync(newFileName, data);
+      results.push({
+        fileName: newFileName,
+        fileSizeBefore: sizeBefore,
+        fileSizeAfter: sizeAfter,
+        percentageChange,
+        isChangeSignificant,
+      });
+
+      if (REPLACE_ORIGINAL_AFTER_EXPORT_WEBP) {
+        unlinkSync(gifFileName);
+      }
+    }
+  }
+
+  return results;
 }

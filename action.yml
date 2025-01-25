@@ -45,5 +45,5 @@ inputs:
     default: "node_modules/**"
 
 runs:
-  using: 'node20'
-  main: 'dist/index.js'
+  using: 'docker'
+  image: 'Dockerfile'
