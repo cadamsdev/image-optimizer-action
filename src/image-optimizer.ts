@@ -134,6 +134,16 @@ function processSvg(svgFileName: string): OptimizedFileResult | undefined {
   const optimizedSvg = optimize(svgContent, {
     path: svgFileName,
     multipass: true,
+    plugins: [
+      {
+        name: 'preset-default',
+        params: {
+          overrides: {
+            removeViewBox: false,
+          },
+        },
+      },
+    ],
   });
   const sizeAfter = Buffer.byteLength(optimizedSvg.data, 'utf8');
   const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
