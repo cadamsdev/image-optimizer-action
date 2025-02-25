@@ -171,9 +171,7 @@ async function processWebp(
 
   if (COMPRESS_WEBP) {
     const { data, info } = await sharp(webpFileData)
-      .webp({
-        nearLossless: true,
-      })
+      .webp()
       .toBuffer({
         resolveWithObject: true,
       });
@@ -197,9 +195,7 @@ async function processWebp(
 
   if (EXPORT_AVIF) {
     const { data, info } = await sharp(webpFileData)
-      .avif({
-        lossless: true,
-      })
+      .avif()
       .toBuffer({
         resolveWithObject: true,
       });
@@ -234,9 +230,7 @@ async function processAvif(
   const sizeBefore = avifFileData.byteLength;
 
   const { data, info } = await sharp(avifFileData)
-    .avif({
-      lossless: true,
-    })
+    .avif()
     .toBuffer({
       resolveWithObject: true,
     });
@@ -290,9 +284,7 @@ async function processJpg(jpgFileName: string): Promise<OptimizedFileResult[]> {
 
   if (EXPORT_WEBP) {
     const { data, info } = await sharp(jpgFileData)
-      .webp({
-        nearLossless: true,
-      })
+      .webp()
       .toBuffer({
         resolveWithObject: true,
       });
@@ -322,9 +314,7 @@ async function processJpg(jpgFileName: string): Promise<OptimizedFileResult[]> {
 
   if (EXPORT_AVIF) {
     const { data, info } = await sharp(jpgFileData)
-      .avif({
-        lossless: true,
-      })
+      .avif()
       .toBuffer({
         resolveWithObject: true,
       });
@@ -381,9 +371,7 @@ async function processPng(pngFileName: string): Promise<OptimizedFileResult[]> {
 
   if (EXPORT_WEBP) {
     const { data, info } = await sharp(pngFileData)
-      .webp({
-        nearLossless: true,
-      })
+      .webp()
       .toBuffer({
         resolveWithObject: true,
       });
@@ -413,9 +401,7 @@ async function processPng(pngFileName: string): Promise<OptimizedFileResult[]> {
 
   if (EXPORT_AVIF) {
     const { data, info } = await sharp(pngFileData)
-      .avif({
-        lossless: true,
-      })
+      .avif()
       .toBuffer({
         resolveWithObject: true,
       });
