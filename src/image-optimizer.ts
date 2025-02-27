@@ -13,7 +13,7 @@ import { log } from './utils/logger-utils';
 import sharp from 'sharp';
 import { optimize } from 'svgo';
 import { readFileSync, unlinkSync, writeFileSync } from 'fs';
-import { getPercentageChange } from './utils/file-utils';
+import { formatSize, getPercentageChange } from './utils/file-utils';
 
 export interface OptimizedFileResult {
   fileName: string;
@@ -27,6 +27,53 @@ export interface ImageProcessorConfig {
   imagesToCompress: string[];
 }
 
+const EXTENSION_TO_CONFIG_MAP: {
+  [key: string]: {
+    flag: boolean;
+    sharpFormat: keyof sharp.FormatEnum;
+    readOptions?: sharp.SharpOptions;
+    exportOptions?: {
+      [key: string]:
+        | sharp.OutputOptions
+        | sharp.JpegOptions
+        | sharp.PngOptions
+        | sharp.WebpOptions
+        | sharp.AvifOptions
+        | sharp.GifOptions;
+    };
+    exportToWebp?: boolean;
+    exportToAvif?: boolean;
+  };
+} = {
+  gif: {
+    flag: COMPRESS_GIF,
+    readOptions: { animated: true },
+    exportOptions: { webp: { nearLossless: true } },
+    sharpFormat: 'gif',
+    exportToWebp: EXPORT_WEBP,
+  },
+  png: {
+    flag: COMPRESS_PNG,
+    sharpFormat: 'png',
+    exportToWebp: EXPORT_WEBP,
+    exportToAvif: EXPORT_AVIF,
+  },
+  jpg: {
+    flag: COMPRESS_JPG,
+    sharpFormat: 'jpeg',
+    exportToWebp: EXPORT_WEBP,
+    exportToAvif: EXPORT_AVIF,
+  },
+  jpeg: {
+    flag: COMPRESS_JPG,
+    sharpFormat: 'jpeg',
+    exportToWebp: EXPORT_WEBP,
+    exportToAvif: EXPORT_AVIF,
+  },
+  webp: { flag: COMPRESS_WEBP, sharpFormat: 'webp', exportToAvif: EXPORT_AVIF },
+  avif: { flag: COMPRESS_AVIF, sharpFormat: 'avif' },
+};
+
 export async function processImages({
   imagesToCompress,
 }: ImageProcessorConfig): Promise<OptimizedFileResult[]> {
@@ -35,42 +82,17 @@ export async function processImages({
     const extension = imageFileName.substring(
       imageFileName.lastIndexOf('.') + 1
     );
-    switch (extension) {
-      case 'svg':
-        const svgResult = processSvg(imageFileName);
-        if (svgResult) {
-          results.push(svgResult);
-        }
-        break;
 
-      case 'gif':
-        const gifResults = await processGif(imageFileName);
-        results.push(...gifResults);
-        break;
-
-      case 'png':
-        const pngResults = await processPng(imageFileName);
-        results.push(...pngResults);
-        break;
-
-      case 'jpg':
-      case 'jpeg':
-        const jpgResults = await processJpg(imageFileName);
-        results.push(...jpgResults);
-        break;
-
-      case 'webp':
-        const webpResults = await processWebp(imageFileName);
-        results.push(...webpResults);
-        break;
-
-      case 'avif':
-        const avifResult = await processAvif(imageFileName);
-        if (avifResult) {
-          results.push(avifResult);
-        }
-        break;
+    if (extension === 'svg') {
+      const svgResult = processSvg(imageFileName);
+      if (svgResult) {
+        results.push(svgResult);
+      }
+      continue;
     }
+
+    const result = await processImage(imageFileName);
+    results.push(...result);
   }
   return results;
 }
@@ -125,7 +147,6 @@ export function getImageProcessorConfig(
 }
 
 function processSvg(svgFileName: string): OptimizedFileResult | undefined {
-  log(`Processing SVG: ${svgFileName}`);
   const svgContent = readFileSync(svgFileName, 'utf8');
   const sizeBefore = Buffer.byteLength(svgContent, 'utf8');
   const optimizedSvg = optimize(svgContent, {
@@ -144,7 +165,11 @@ function processSvg(svgFileName: string): OptimizedFileResult | undefined {
   });
   const sizeAfter = Buffer.byteLength(optimizedSvg.data, 'utf8');
   const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
-  log(`SVG: ${svgFileName} - ${sizeBefore} -> ${sizeAfter} (${percentageChange}%)`);
+  log(
+    `SVG: ${svgFileName} - ${formatSize(sizeBefore)} -> ${formatSize(
+      sizeAfter
+    )} (${percentageChange.toFixed(2)}%)`
+  );
   const isChangeSignificant = percentageChange < -1;
 
   if (!isChangeSignificant) {
@@ -161,30 +186,35 @@ function processSvg(svgFileName: string): OptimizedFileResult | undefined {
   };
 }
 
-async function processWebp(
-  webpFileName: string
+export async function processImage(
+  imageFileName: string
 ): Promise<OptimizedFileResult[]> {
-  log(`Processing WEBP: ${webpFileName}`);
-  const webpFileData = readFileSync(webpFileName);
-  const sizeBefore = webpFileData.byteLength;
   const results: OptimizedFileResult[] = [];
+  const extension = imageFileName.substring(imageFileName.lastIndexOf('.') + 1);
+  const fileData = readFileSync(imageFileName);
+  const sizeBefore = fileData.byteLength;
+  const config = EXTENSION_TO_CONFIG_MAP[extension];
 
-  if (COMPRESS_WEBP) {
-    const { data, info } = await sharp(webpFileData)
-      .webp()
+  if (config.flag && !REPLACE_ORIGINAL_AFTER_EXPORT_WEBP) {
+    const { data, info } = await sharp(fileData, config.readOptions)
+      .toFormat(config.sharpFormat, config.exportOptions?.[config.sharpFormat])
       .toBuffer({
         resolveWithObject: true,
       });
 
     const sizeAfter = info.size;
     const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
-    log(`WEBP (compress_webp): ${webpFileName} - ${sizeBefore} -> ${sizeAfter} (${percentageChange}%)`);
+    log(
+      `${extension.toUpperCase()} (compress_${extension}): ${imageFileName} - ${formatSize(
+        sizeBefore
+      )} -> ${formatSize(sizeAfter)} (${percentageChange.toFixed(2)}%)`
+    );
     const isChangeSignificant = percentageChange < -1;
 
     if (isChangeSignificant) {
-      writeFileSync(webpFileName, data);
+      writeFileSync(imageFileName, data);
       results.push({
-        fileName: webpFileName,
+        fileName: imageFileName,
         fileSizeBefore: sizeBefore,
         fileSizeAfter: sizeAfter,
         percentageChange,
@@ -193,113 +223,28 @@ async function processWebp(
     }
   }
 
-  if (EXPORT_AVIF) {
-    const { data, info } = await sharp(webpFileData)
-      .avif()
+  if (config.exportToWebp) {
+    const { data, info } = await sharp(fileData, config.readOptions)
+      .toFormat('webp', config.exportOptions?.webp)
       .toBuffer({
         resolveWithObject: true,
       });
 
     const sizeAfter = info.size;
     const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
-    log(`WEBP (export_avif): ${webpFileName} - ${sizeBefore} -> ${sizeAfter} (${percentageChange}%)`);
+    log(
+      `${extension.toUpperCase()} (export_webp): ${imageFileName} - ${formatSize(
+        sizeBefore
+      )} -> ${formatSize(sizeAfter)} (${percentageChange.toFixed(2)}%)`
+    );
     const isChangeSignificant = percentageChange < -1;
-    const newFileName = webpFileName.replace('.webp', '.avif');
-
-    if (isChangeSignificant) {
-      writeFileSync(newFileName, data);
-      results.push({
-        fileName: newFileName,
-        fileSizeBefore: sizeBefore,
-        fileSizeAfter: sizeAfter,
-        percentageChange,
-        isChangeSignificant,
-      });
-    }
-  }
-
-  return results;
-}
-
-async function processAvif(
-  avifFileName: string
-): Promise<OptimizedFileResult | undefined> {
-  log(`Processing AVIF: ${avifFileName}`);
-
-  const avifFileData = readFileSync(avifFileName);
-  const sizeBefore = avifFileData.byteLength;
-
-  const { data, info } = await sharp(avifFileData)
-    .avif()
-    .toBuffer({
-      resolveWithObject: true,
-    });
-
-  const sizeAfter = info.size;
-  const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
-  log(`AVIF: ${avifFileName} - ${sizeBefore} -> ${sizeAfter} (${percentageChange}%)`);
-  const isChangeSignificant = percentageChange < -1;
-
-  if (!isChangeSignificant) {
-    return;
-  }
-
-  writeFileSync(avifFileName, data);
-  return {
-    fileName: avifFileName,
-    fileSizeBefore: sizeBefore,
-    fileSizeAfter: sizeAfter,
-    percentageChange,
-    isChangeSignificant,
-  };
-}
-
-async function processJpg(jpgFileName: string): Promise<OptimizedFileResult[]> {
-  log(`Processing JPG: ${jpgFileName}`);
-  const jpgFileData = readFileSync(jpgFileName);
-  const sizeBefore = jpgFileData.byteLength;
-  const results: OptimizedFileResult[] = [];
-
-  if (COMPRESS_JPG && !REPLACE_ORIGINAL_AFTER_EXPORT_WEBP) {
-    const { data, info } = await sharp(jpgFileData).jpeg().toBuffer({
-      resolveWithObject: true,
-    });
-
-    const sizeAfter = info.size;
-    const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
-    log(`JPG (compress_jpg): ${jpgFileName} - ${sizeBefore} -> ${sizeAfter} (${percentageChange}%)`);
-    const isChangeSignificant = percentageChange < -1;
-
-    if (isChangeSignificant) {
-      writeFileSync(jpgFileName, data);
-      results.push({
-        fileName: jpgFileName,
-        fileSizeBefore: sizeBefore,
-        fileSizeAfter: sizeAfter,
-        percentageChange,
-        isChangeSignificant,
-      });
-    }
-  }
-
-  if (EXPORT_WEBP) {
-    const { data, info } = await sharp(jpgFileData)
-      .webp()
-      .toBuffer({
-        resolveWithObject: true,
-      });
-
-    const sizeAfter = info.size;
-    const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
-    log(`JPG (export_webp): ${jpgFileName} - ${sizeBefore} -> ${sizeAfter} (${percentageChange}%)`);
-    const isChangeSignificant = percentageChange < -1;
-    const newFileName = jpgFileName.replace('.jpg', '.webp');
+    const newFileName = imageFileName.replace(`.${extension}`, '.webp');
 
     if (isChangeSignificant) {
       writeFileSync(newFileName, data);
 
       if (REPLACE_ORIGINAL_AFTER_EXPORT_WEBP) {
-        unlinkSync(jpgFileName);
+        unlinkSync(imageFileName);
       }
 
       results.push({
@@ -312,18 +257,22 @@ async function processJpg(jpgFileName: string): Promise<OptimizedFileResult[]> {
     }
   }
 
-  if (EXPORT_AVIF) {
-    const { data, info } = await sharp(jpgFileData)
-      .avif()
+  if (config.exportToAvif) {
+    const { data, info } = await sharp(fileData, config.readOptions)
+      .toFormat('avif', config.exportOptions?.avif)
       .toBuffer({
         resolveWithObject: true,
       });
 
     const sizeAfter = info.size;
     const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
-    log(`JPG (export_avif): ${jpgFileName} - ${sizeBefore} -> ${sizeAfter} (${percentageChange}%)`);
+    log(
+      `${extension.toUpperCase()} (export_avif): ${imageFileName} - ${formatSize(
+        sizeBefore
+      )} -> ${formatSize(sizeAfter)} (${percentageChange.toFixed(2)}%)`
+    );
     const isChangeSignificant = percentageChange < -1;
-    const newFileName = jpgFileName.replace('.jpg', '.avif');
+    const newFileName = imageFileName.replace(`.${extension}`, '.avif');
 
     if (isChangeSignificant) {
       writeFileSync(newFileName, data);
@@ -334,158 +283,6 @@ async function processJpg(jpgFileName: string): Promise<OptimizedFileResult[]> {
         percentageChange,
         isChangeSignificant,
       });
-    }
-  }
-  return results;
-}
-
-async function processPng(pngFileName: string): Promise<OptimizedFileResult[]> {
-  log(`Processing PNG: ${pngFileName}`);
-
-  const results: OptimizedFileResult[] = [];
-  const pngFileData = readFileSync(pngFileName);
-  const sizeBefore = pngFileData.byteLength;
-
-  if (COMPRESS_PNG && !REPLACE_ORIGINAL_AFTER_EXPORT_WEBP) {
-    const { data, info } = await sharp(pngFileData).png().toBuffer({
-      resolveWithObject: true,
-    });
-
-    const sizeAfter = info.size;
-    const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
-    log(`PNG (compress_png): ${pngFileName} - ${sizeBefore} -> ${sizeAfter} (${percentageChange}%)`);
-    const isChangeSignificant = percentageChange < -1;
-
-    if (isChangeSignificant) {
-      results.push({
-        fileName: pngFileName,
-        fileSizeBefore: sizeBefore,
-        fileSizeAfter: sizeAfter,
-        percentageChange,
-        isChangeSignificant,
-      });
-
-      writeFileSync(pngFileName, data);
-    }
-  }
-
-  if (EXPORT_WEBP) {
-    const { data, info } = await sharp(pngFileData)
-      .webp()
-      .toBuffer({
-        resolveWithObject: true,
-      });
-
-    const sizeAfter = info.size;
-    const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
-    log(`PNG (export_webp): ${pngFileName} - ${sizeBefore} -> ${sizeAfter} (${percentageChange}%)`);
-    const isChangeSignificant = percentageChange < -1;
-    const newFileName = pngFileName.replace('.png', '.webp');
-
-    if (isChangeSignificant) {
-      writeFileSync(newFileName, data);
-
-      if (REPLACE_ORIGINAL_AFTER_EXPORT_WEBP) {
-        unlinkSync(pngFileName);
-      }
-
-      results.push({
-        fileName: newFileName,
-        fileSizeBefore: sizeBefore,
-        fileSizeAfter: sizeAfter,
-        percentageChange,
-        isChangeSignificant,
-      });
-    }
-  }
-
-  if (EXPORT_AVIF) {
-    const { data, info } = await sharp(pngFileData)
-      .avif()
-      .toBuffer({
-        resolveWithObject: true,
-      });
-
-    const sizeAfter = info.size;
-    const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
-    log(`PNG (export_avif): ${pngFileName} - ${sizeBefore} -> ${sizeAfter} (${percentageChange}%)`);
-    const isChangeSignificant = percentageChange < -1;
-    const newFileName = pngFileName.replace('.png', '.avif');
-
-    if (isChangeSignificant) {
-      results.push({
-        fileName: newFileName,
-        fileSizeBefore: sizeBefore,
-        fileSizeAfter: sizeAfter,
-        percentageChange,
-        isChangeSignificant,
-      });
-
-      writeFileSync(newFileName, data);
-    }
-  }
-
-  return results;
-}
-
-async function processGif(gifFileName: string): Promise<OptimizedFileResult[]> {
-  log(`Processing GIF: ${gifFileName}`);
-  const gifFileData = readFileSync(gifFileName);
-  const sizeBefore = gifFileData.byteLength;
-  const results: OptimizedFileResult[] = [];
-
-  if (COMPRESS_GIF && !REPLACE_ORIGINAL_AFTER_EXPORT_WEBP) {
-    const { data, info } = await sharp(gifFileData, { animated: true })
-      .gif()
-      .toBuffer({
-        resolveWithObject: true,
-      });
-
-    const sizeAfter = info.size;
-    const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
-    log(`GIF (compress_gif): ${gifFileName} - ${sizeBefore} -> ${sizeAfter} (${percentageChange}%)`);
-    const isChangeSignificant = percentageChange < -1;
-
-    if (isChangeSignificant) {
-      writeFileSync(gifFileName, data);
-      results.push({
-        fileName: gifFileName,
-        fileSizeBefore: sizeBefore,
-        fileSizeAfter: sizeAfter,
-        percentageChange,
-        isChangeSignificant,
-      });
-    }
-  }
-
-  if (EXPORT_WEBP) {
-    const { data, info } = await sharp(gifFileData, { animated: true })
-      .webp({
-        nearLossless: true,
-      })
-      .toBuffer({
-        resolveWithObject: true,
-      });
-
-    const sizeAfter = info.size;
-    const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
-    log(`GIF (export_webp): ${gifFileName} - ${sizeBefore} -> ${sizeAfter} (${percentageChange}%)`);
-    const isChangeSignificant = percentageChange < -1;
-    const newFileName = gifFileName.replace('.gif', '.webp');
-
-    if (isChangeSignificant) {
-      writeFileSync(newFileName, data);
-      results.push({
-        fileName: newFileName,
-        fileSizeBefore: sizeBefore,
-        fileSizeAfter: sizeAfter,
-        percentageChange,
-        isChangeSignificant,
-      });
-
-      if (REPLACE_ORIGINAL_AFTER_EXPORT_WEBP) {
-        unlinkSync(gifFileName);
-      }
     }
   }
 
