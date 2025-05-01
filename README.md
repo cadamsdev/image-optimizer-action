@@ -106,6 +106,48 @@ jobs:
           body: ${{ steps.compress-images.outputs.markdown_report }}
 ```
 
+### Scheduling
+
+[GitHub Actions scheduling](https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#schedule).
+
+
+```yml
+name: Compress Images (Manual)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # For daily runs at midnight UTC, use:
+    - cron: '0 0 * * *'
+    # For weekly runs (e.g., every Sunday at midnight UTC), use:
+    # - cron: '0 0 * * 0'
+
+jobs:
+  build:
+    name: cadamsdev/image-optimizer-action
+    permissions: write-all
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Compress Images
+        id: compress-images
+        uses: cadamsdev/image-optimizer-action@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create New Pull Request If Needed
+        if: steps.compress-images.outputs.markdown_report != ''
+        uses: peter-evans/create-pull-request@v5
+        with:
+          title: Compressed Images
+          branch-suffix: timestamp
+          commit-message: Compressed Images
+          body: ${{ steps.compress-images.outputs.markdown_report }}
+```
+
 ## 🔧 Configuration
 
 e.g
