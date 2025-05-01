@@ -5,16 +5,31 @@ import { sync } from 'glob';
 
 export const githubApi = getOctokit(GITHUB_TOKEN);
 
-export function getEventData() {
+export interface EventData {
+  owner: string;
+  repo: string;
+  issue_number: number;
+  isWorkflowDispatch: boolean;
+  isPullRequest: boolean;
+  isScheduled: boolean;
+  eventName: string;
+}
+
+export function getEventData(): EventData {
   const owner = context.repo.owner;
   const repo = context.repo.repo;
   const prNumber = context.payload.pull_request?.number || 0;
   const isWorkflowDispatch = context.eventName === 'workflow_dispatch';
+  const isPullRequest = context.eventName === 'pull_request';
+  const isScheduled = context.eventName === 'schedule';
   return {
     owner,
     repo,
     issue_number: prNumber,
     isWorkflowDispatch,
+    isPullRequest,
+    isScheduled,
+    eventName: context.eventName,
   };
 }
 
