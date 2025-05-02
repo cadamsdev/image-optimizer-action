@@ -22,12 +22,15 @@ jobs:
       with:
         node-version: 22
         cache: 'npm'
+  
+    - name: Install dependencies
+      run: npm ci
 
-    - run: npm ci
-      name: Install dependencies
+    - name: Prettier Check
+      run: npx prettier --check .
 
     - name: Lint
       run: npm run lint
 
-    - run: npm run build
-      name: Build
+    - name: Build
+      run: npm run build
