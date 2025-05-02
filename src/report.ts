@@ -12,7 +12,7 @@ export interface ReportData {
 }
 
 export async function generateReport(
-  data: OptimizedFileResult[]
+  data: OptimizedFileResult[],
 ): Promise<ReportData> {
   const sortedData = Array.from(data).sort((a, b) => {
     return a.fileName.localeCompare(b.fileName);
@@ -20,7 +20,7 @@ export async function generateReport(
 
   const totalSaved = sortedData.reduce(
     (acc, item) => acc + item.fileSizeBefore - (item.fileSizeAfter || 0),
-    0
+    0,
   );
 
   let markdownReport = await generateMarkdownReport(sortedData, totalSaved);
@@ -34,7 +34,7 @@ export async function generateReport(
 
 async function generateMarkdownReport(
   data: OptimizedFileResult[],
-  totalSaved: number
+  totalSaved: number,
 ): Promise<string> {
   const description = `Optimized <b>${data.length}</b> ${
     data.length > 1 ? 'images' : 'image'
@@ -44,8 +44,8 @@ async function generateMarkdownReport(
     .map(
       (item) =>
         `| ${item.fileName} | ${formatSize(item.fileSizeBefore)} | ${formatSize(
-          item.fileSizeAfter
-        )} | ${item.percentageChange.toFixed(2) + '%'} |\n`
+          item.fileSizeAfter,
+        )} | ${item.percentageChange.toFixed(2) + '%'} |\n`,
     )
     .join('');
   const markdown = description + header + rows;
@@ -55,7 +55,7 @@ async function generateMarkdownReport(
 
 async function generateTerminalReport(
   data: OptimizedFileResult[],
-  totalSaved: number
+  totalSaved: number,
 ): Promise<string> {
   const columns = ['Filename', 'Before', 'After', 'Difference'];
   const rows = data.map((item) => [
@@ -81,7 +81,7 @@ async function generateTerminalReport(
 
 async function generateShortMarkdownReport(
   data: OptimizedFileResult[],
-  totalSaved: number
+  totalSaved: number,
 ): Promise<string> {
   const jobUrl = await getJobUrl();
   log(`runUrl=${jobUrl}`);

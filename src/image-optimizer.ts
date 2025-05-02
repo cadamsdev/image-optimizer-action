@@ -80,7 +80,7 @@ export async function processImages({
   const results: OptimizedFileResult[] = [];
   for (let imageFileName of imagesToCompress) {
     const extension = imageFileName.substring(
-      imageFileName.lastIndexOf('.') + 1
+      imageFileName.lastIndexOf('.') + 1,
     );
 
     if (extension === 'svg') {
@@ -98,7 +98,7 @@ export async function processImages({
 }
 
 export function getImageProcessorConfig(
-  allFiles: string[]
+  allFiles: string[],
 ): ImageProcessorConfig {
   let svgCount = 0;
   let pngCount = 0;
@@ -167,8 +167,8 @@ function processSvg(svgFileName: string): OptimizedFileResult | undefined {
   const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
   log(
     `SVG: ${svgFileName} - ${formatSize(sizeBefore)} -> ${formatSize(
-      sizeAfter
-    )} (${percentageChange.toFixed(2)}%)`
+      sizeAfter,
+    )} (${percentageChange.toFixed(2)}%)`,
   );
   const isChangeSignificant = percentageChange < -1;
 
@@ -187,7 +187,7 @@ function processSvg(svgFileName: string): OptimizedFileResult | undefined {
 }
 
 export async function processImage(
-  imageFileName: string
+  imageFileName: string,
 ): Promise<OptimizedFileResult[]> {
   const results: OptimizedFileResult[] = [];
   const extension = imageFileName.substring(imageFileName.lastIndexOf('.') + 1);
@@ -206,8 +206,8 @@ export async function processImage(
     const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
     log(
       `${extension.toUpperCase()} (compress_${extension}): ${imageFileName} - ${formatSize(
-        sizeBefore
-      )} -> ${formatSize(sizeAfter)} (${percentageChange.toFixed(2)}%)`
+        sizeBefore,
+      )} -> ${formatSize(sizeAfter)} (${percentageChange.toFixed(2)}%)`,
     );
     const isChangeSignificant = percentageChange < -1;
 
@@ -234,8 +234,8 @@ export async function processImage(
     const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
     log(
       `${extension.toUpperCase()} (export_webp): ${imageFileName} - ${formatSize(
-        sizeBefore
-      )} -> ${formatSize(sizeAfter)} (${percentageChange.toFixed(2)}%)`
+        sizeBefore,
+      )} -> ${formatSize(sizeAfter)} (${percentageChange.toFixed(2)}%)`,
     );
     const isChangeSignificant = percentageChange < -1;
     const newFileName = imageFileName.replace(`.${extension}`, '.webp');
@@ -268,8 +268,8 @@ export async function processImage(
     const percentageChange = getPercentageChange(sizeBefore, sizeAfter);
     log(
       `${extension.toUpperCase()} (export_avif): ${imageFileName} - ${formatSize(
-        sizeBefore
-      )} -> ${formatSize(sizeAfter)} (${percentageChange.toFixed(2)}%)`
+        sizeBefore,
+      )} -> ${formatSize(sizeAfter)} (${percentageChange.toFixed(2)}%)`,
     );
     const isChangeSignificant = percentageChange < -1;
     const newFileName = imageFileName.replace(`.${extension}`, '.avif');

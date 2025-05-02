@@ -6,7 +6,7 @@ A GitHub action that automatically compresses images in pull requests. Free and 
 
 ## ✨ Features
 
-✅ Fast, efficient and near-lossless compression 
+✅ Fast, efficient and near-lossless compression
 
 ✅ Supports compressing SVG, PNG, JPG, GIF, WEBP, and AVIF
 
@@ -25,6 +25,7 @@ This tool is completely free. If you enjoy the tool please help support us.
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/cadamsdev)
 
 # 📚 Table of Contents
+
 1. [Media](#media)
 2. [Usage](#usage)
 3. [Configuration](#configuration)
@@ -109,7 +110,6 @@ jobs:
 ### Scheduling
 
 [GitHub Actions scheduling](https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#schedule).
-
 
 ```yml
 name: Compress Images (Manual)

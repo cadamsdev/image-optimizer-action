@@ -4,7 +4,7 @@ import { exec } from '@actions/exec';
 export async function setupGitConfig() {
   await exec('git config --global user.name github-actions[bot]');
   await exec(
-    'git config --global user.email 41898282+github-actions[bot]@users.noreply.github.com'
+    'git config --global user.email 41898282+github-actions[bot]@users.noreply.github.com',
   );
   await exec('git config --global --add safe.directory /github/workspace');
 }

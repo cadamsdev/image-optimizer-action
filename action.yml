@@ -7,42 +7,42 @@ branding:
 
 inputs:
   github-token:
-    description: "GitHub Token"
+    description: 'GitHub Token'
     required: true
   debug:
-    description: "Enable debug mode"
+    description: 'Enable debug mode'
     required: false
   compress-png:
-    description: "Compress PNG files"
+    description: 'Compress PNG files'
     required: false
   compress-svg:
-    description: "Compress SVG files"
+    description: 'Compress SVG files'
     required: false
   compress-jpg:
-    description: "Compress JPG files"
+    description: 'Compress JPG files'
     required: false
   compress-gif:
-    description: "Compress GIF files"
+    description: 'Compress GIF files'
     required: false
   compress-webp:
-    description: "Compress WebP files"
+    description: 'Compress WebP files'
     required: false
   compress-avif:
-    description: "Compress AVIF files"
+    description: 'Compress AVIF files'
     required: false
   export-webp:
-    description: "Export WebP files"
+    description: 'Export WebP files'
     required: false
   export-avif:
-    description: "Export AVIF files"
+    description: 'Export AVIF files'
     required: false
   replace-original-after-export-webp:
-    description: "Replace original files after exporting WebP files"
+    description: 'Replace original files after exporting WebP files'
     required: false
   ignore-paths:
-    description: "Paths to ignore"
+    description: 'Paths to ignore'
     required: false
-    default: "node_modules/**"
+    default: 'node_modules/**'
 
 runs:
   using: 'docker'
