@@ -10,6 +10,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -34,6 +38,6 @@ jobs:
         run: npm run build
 
       - name: Create Release PR or Release
-        uses: cadamsdev/lazy-release-action@75f2b4e799ea3cb851d450d9399853628412f58b # 0.4.1
+        uses: stellasoftio/lazy-release-action@75f2b4e799ea3cb851d450d9399853628412f58b # 0.4.1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
