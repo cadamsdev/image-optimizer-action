@@ -1,6 +1,6 @@
 # Image Optimizer Action
 
-[![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/cadamsdev/notes/issues) [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) ![GitHub Tag](https://img.shields.io/github/v/tag/cadamsdev/image-optimizer-action)
+[![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/stellasoftio/image-optimizer-action/issues) [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) ![GitHub Tag](https://img.shields.io/github/v/tag/stellasoftio/image-optimizer-action)
 
 A GitHub action that automatically compresses images in pull requests. Free and open-source alternative to [imgbot](https://imgbot.net/).
 
@@ -58,7 +58,7 @@ on:
 jobs:
   build:
     if: github.event.pull_request.head.repo.full_name == github.repository
-    name: cadamsdev/image-optimizer-action
+    name: stellasoftio/image-optimizer-action
     permissions: write-all
     runs-on: ubuntu-latest
     steps:
@@ -67,7 +67,7 @@ jobs:
 
       - name: Compress Images
         id: compress-images
-        uses: cadamsdev/image-optimizer-action@v1
+        uses: stellasoftio/image-optimizer-action@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -83,7 +83,7 @@ on: workflow_dispatch
 
 jobs:
   build:
-    name: cadamsdev/image-optimizer-action
+    name: stellasoftio/image-optimizer-action
     permissions: write-all
     runs-on: ubuntu-latest
 
@@ -93,7 +93,7 @@ jobs:
 
       - name: Compress Images
         id: compress-images
-        uses: cadamsdev/image-optimizer-action@v1
+        uses: stellasoftio/image-optimizer-action@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -124,7 +124,7 @@ on:
 
 jobs:
   build:
-    name: cadamsdev/image-optimizer-action
+    name: stellasoftio/image-optimizer-action
     permissions: write-all
     runs-on: ubuntu-latest
 
@@ -134,7 +134,7 @@ jobs:
 
       - name: Compress Images
         id: compress-images
-        uses: cadamsdev/image-optimizer-action@v1
+        uses: stellasoftio/image-optimizer-action@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
