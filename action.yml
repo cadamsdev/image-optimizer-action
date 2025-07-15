@@ -1,5 +1,5 @@
 name: 'Image Optimizer Action'
-description: 'A GitHub Action to optimize images'
+description: 'Automatically compress SVG, PNG, JPG, GIF, WEBP, and AVIF in pull requests.'
 author: 'Chad Adams'
 branding:
   icon: 'image'
