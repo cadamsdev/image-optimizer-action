@@ -31,6 +31,7 @@ jobs:
         run: npm ci
 
       - name: Create Release PR or Release
-        uses: stellasoftio/lazy-release-action@75f2b4e799ea3cb851d450d9399853628412f58b # 0.4.1
+        uses: stellasoftio/lazy-release-action@40cbbc343f8b7c8efb5c7ae4e7fd9b9584472531 # v0.5.1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          end-commit: '2234f6208e0c5f12092b557f9e216b28045da54e'
