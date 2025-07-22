@@ -5,5 +5,6 @@
     "group:allNonMajor",
     "helpers:pinGitHubActionDigests"
   ],
-  "rangeStrategy": "bump"
+  "rangeStrategy": "bump",
+  "schedule": ["before 6am on monday"]
 }
